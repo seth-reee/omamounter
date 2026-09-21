@@ -1,70 +1,72 @@
 # omamounter
 
-omamounter is a lightweight native Qt 6 Widgets application for managing NFS
-and SMB/CIFS shares on Omarchy Linux. The GUI is an ordinary unprivileged C++
-application. Two small QtCore-only helpers perform narrowly scoped privileged
-configuration and mount control through fixed Polkit actions.
+A lightweight desktop application for managing NFS and SMB/CIFS network shares
+on [Omarchy](https://omarchy.org/).
 
-## Runtime requirements
+## Features
 
-Omarchy already provides Qt 6, Polkit, and Secret Service support. Protocol
-tools are installed only when needed:
+- Manage multiple NFS and SMB servers from one interface
+- Discover available exports and shares
+- Mount or unmount individual selections or all configured shares
+- Prefer hostnames with an optional fallback IP address
+- Mount shares at boot or automatically on first access
+- Follow the active Omarchy light or dark theme
+- Store SMB passwords securely with Secret Service
+- Keep network and mount operations off the interface thread
+
+## Installation
+
+Install the protocol tools you plan to use:
 
 ```bash
 sudo pacman -S nfs-utils cifs-utils smbclient
 ```
 
-No Python, PySide, Rust, Cargo, or third-party application runtime is required.
-
-## Build and test
+Download the latest Arch package from the project releases and install it with:
 
 ```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
+sudo pacman -U omamounter-*.pkg.tar.zst
 ```
 
-The development executable is `build/omamounter`. Privileged Apply and
-Mount/Unmount actions require package installation because Polkit uses fixed
-helper paths under `/usr/lib/omamounter`.
-
-## Arch package
-
-Create `omamounter-0.2.0.tar.gz`, place it beside the PKGBUILD, then run:
+After installation, launch **omamounter** from the application menu or run:
 
 ```bash
-cd packaging
-makepkg -si
+omamounter
 ```
-
-The package installs `/usr/bin/omamounter`, two helpers under
-`/usr/lib/omamounter`, the desktop launcher, and the fixed Polkit policy.
 
 ## Usage
 
-First launch imports the editable reference configuration for `sakuya.weeb`,
-its fallback IP, and the nine NFS shares. Open **Settings** to edit servers and
-shares, test connectivity, discover exports/shares, enter SMB credentials, and
-choose an automatic mounting mode:
+Open **Settings** to add a server, choose NFS or SMB, test the connection, and
+discover its shares. Shares can also be added manually when discovery is not
+available.
 
-- `disabled`: manually controlled from the main window.
-- `boot`: mounted when the machine boots.
-- `access`: mounted by systemd when its local directory is accessed.
+Each share supports one of three mounting modes:
 
-Use **Preview / apply system configuration** to review generated units. Apply
-requires administrator authorization. Afterwards Mount/Unmount operations are
-passwordless but restricted to share IDs in the root-owned manifest.
+- **Disabled** — mount and unmount it manually from the main window
+- **Boot** — mount it automatically when the system starts
+- **Access** — connect when its local directory is first accessed
 
-SMB passwords are stored through Secret Service, never in normal JSON or
-process arguments. Apply transfers them to the helper over standard input;
-boot credentials are stored root-only.
+Use **Preview / apply system configuration** after changing shares or automatic
+mounting preferences. Applying system configuration requires administrator
+authorization. Routine mount and unmount operations do not.
+
+## Security
+
+The graphical application never runs as root. Privileged operations are
+limited to validated omamounter configuration and shares previously approved
+by the user.
+
+SMB passwords are kept out of the application configuration and command-line
+arguments. They are stored with Secret Service and installed for boot mounting
+as root-readable credentials.
 
 ## Troubleshooting
 
-- NFSv4 servers may not expose exports through `showmount`; manual entry is
-  always available.
-- If a hostname does not resolve, omamounter uses its configured fallback IP
-  for connection testing and discovery.
-- Apply must be completed once before main-window Mount/Unmount actions work.
-- Configuration is stored below `$XDG_CONFIG_HOME/omamounter` or
-  `~/.config/omamounter`.
+- NFSv4 servers do not always support export discovery. Add the export path
+  manually when it does not appear.
+- Confirm that the required protocol tools are installed and that the server
+  permits access from this machine.
+- Apply the system configuration once before using the main-window mount and
+  unmount controls.
+- User configuration is stored in `~/.config/omamounter/config.json` unless
+  `XDG_CONFIG_HOME` is set.
