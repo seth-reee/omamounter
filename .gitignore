@@ -1,0 +1,9 @@
+/build/
+/packaging/src/
+/packaging/pkg/
+/packaging/*.pkg.tar.*
+/packaging/*.tar.gz
+/.cache/
+/.idea/
+/.vscode/
+*~

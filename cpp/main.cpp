@@ -1,0 +1,20 @@
+#include "config.h"
+#include "mainwindow.h"
+#include "theme.h"
+#include <QApplication>
+#include <QMessageBox>
+
+int main(int argc, char **argv) {
+  QApplication app(argc, argv);
+  app.setApplicationName("omamounter");
+  ThemeManager theme(&app);
+  try {
+    ConfigStore store;
+    MainWindow window(store.load(), store);
+    window.show();
+    return app.exec();
+  } catch (const std::exception &e) {
+    QMessageBox::critical(nullptr, "omamounter", e.what());
+    return 1;
+  }
+}

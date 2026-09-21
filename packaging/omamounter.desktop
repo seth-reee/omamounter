@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=omamounter
+Comment=Manage NFS and SMB network shares
+Exec=omamounter
+Icon=folder-remote
+Terminal=false
+Categories=System;Utility;Network;
+Keywords=nfs;smb;cifs;mount;share;
