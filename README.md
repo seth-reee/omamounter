@@ -70,3 +70,7 @@ as root-readable credentials.
   unmount controls.
 - User configuration is stored in `~/.config/omamounter/config.json` unless
   `XDG_CONFIG_HOME` is set.
+
+## License
+
+omamounter is available under the [MIT License](LICENSE).
