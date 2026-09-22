@@ -40,6 +40,10 @@ target_compile_definitions(omamounter-apply-helper PRIVATE OMAMOUNTER_APPLY_HELP
 target_compile_definitions(omamounter-control-helper PRIVATE OMAMOUNTER_CONTROL_HELPER)
 
 enable_testing()
+add_executable(helper_integration tests_cpp/helper_integration.cpp cpp/config.cpp cpp/mountidentity.cpp cpp/filetransaction.cpp)
+target_include_directories(helper_integration PRIVATE cpp)
+target_link_libraries(helper_integration PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME helper_integration COMMAND helper_integration)
 add_executable(omamounter_tests tests_cpp/tests.cpp cpp/settingsdialog.cpp cpp/settingsdialog.h)
 target_link_libraries(omamounter_tests PRIVATE omamounter_core Qt6::Test Qt6::Concurrent)
 add_test(NAME omamounter_tests COMMAND omamounter_tests)

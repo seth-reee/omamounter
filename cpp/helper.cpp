@@ -21,9 +21,17 @@
 #include <stdexcept>
 
 namespace {
+#ifdef OMAMOUNTER_HELPER_TEST
+QString systemdDir, stateDir, manifestPath;
+QJsonObject testRequest;
+QByteArray testMountinfo;
+QStringList testCommands;
+QString testFailure;
+#else
 const QString systemdDir = "/etc/systemd/system";
 const QString stateDir = "/etc/omamounter";
 const QString manifestPath = stateDir + "/managed.json";
+#endif
 
 struct Generated {
   QString source, type;
@@ -53,6 +61,9 @@ bool validOptions(const QString &v) {
 }
 
 QString chosenAddress(const Server &server) {
+#ifdef OMAMOUNTER_HELPER_TEST
+  return server.hostname;
+#else
   QByteArray hostname = server.hostname.toUtf8();
   addrinfo hints{};
   hints.ai_family = AF_INET;
@@ -64,6 +75,7 @@ QString chosenAddress(const Server &server) {
   if (!server.fallbackIp.isEmpty() && validHost(server.fallbackIp))
     return server.fallbackIp;
   fail("Hostname did not resolve and no fallback IP is configured");
+#endif
 }
 
 QString escapePath(const QString &value) {
@@ -94,9 +106,18 @@ void writeFile(const QString &path, const QByteArray &data,
     fail("Could not secure " + path);
 }
 void systemctl(const QStringList &arguments, bool tolerateFailure = false) {
+#ifdef OMAMOUNTER_HELPER_TEST
+  const auto command = arguments.join(' ');
+  testCommands << command;
+  if (command == testFailure) {
+    testFailure.clear();
+    if (!tolerateFailure) fail("Injected systemctl failure");
+  }
+#else
   int code = QProcess::execute("/usr/bin/systemctl", arguments);
   if (code != 0 && !tolerateFailure)
     fail("systemctl " + arguments.join(' ') + " failed");
+#endif
 }
 
 Generated generate(const Server &server, const Share &share) {
@@ -170,11 +191,15 @@ QByteArray stdinData() {
   return input.readAll();
 }
 QJsonObject parseInput() {
+#ifdef OMAMOUNTER_HELPER_TEST
+  return testRequest;
+#else
   QJsonParseError error;
   auto doc = QJsonDocument::fromJson(stdinData(), &error);
   if (error.error != QJsonParseError::NoError || !doc.isObject())
     fail("Invalid JSON request");
   return doc.object();
+#endif
 }
 
 QJsonArray loadManaged() {
@@ -188,12 +213,18 @@ QJsonArray loadManaged() {
 }
 
 void verifyMount(const QJsonObject &record) {
+#ifdef OMAMOUNTER_HELPER_TEST
+  if (!mountIdentityMatches(testMountinfo, record["local_path"].toString(),
+                            record["source"].toString(), record["type"].toString(),
+                            !record["automount_unit"].toString().isEmpty()))
+#else
   QFile mounts("/proc/self/mountinfo");
   if (!mounts.open(QIODevice::ReadOnly) ||
       !mountIdentityMatches(mounts.readAll(), record["local_path"].toString(),
                             record["source"].toString(),
                             record["type"].toString(),
                             !record["automount_unit"].toString().isEmpty()))
+#endif
     fail("Mount identity could not be verified; refusing to change this share. "
          "Reapply legacy configurations first.");
 }
@@ -407,6 +438,7 @@ void control() {
 }
 } // namespace
 
+#ifndef OMAMOUNTER_HELPER_TEST
 int main(int argc, char **argv) {
   QCoreApplication app(argc, argv);
   if (geteuid() != 0) {
@@ -431,3 +463,4 @@ int main(int argc, char **argv) {
     return 1;
   }
 }
+#endif
