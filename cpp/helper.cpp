@@ -1,4 +1,7 @@
 #include "config.h"
+#include "filetransaction.h"
+#include "mountidentity.h"
+#include <QLockFile>
 
 #include <QCoreApplication>
 #include <QDir>
@@ -23,6 +26,7 @@ const QString stateDir = "/etc/omamounter";
 const QString manifestPath = stateDir + "/managed.json";
 
 struct Generated {
+  QString source, type;
   QString shareId, mountUnit, automountUnit, localPath, enableUnit;
   QHash<QString, QByteArray> files;
 };
@@ -83,8 +87,8 @@ QString escapePath(const QString &value) {
 void writeFile(const QString &path, const QByteArray &data,
                QFileDevice::Permissions permissions) {
   QSaveFile file(path);
-  if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() ||
-      !file.commit())
+  if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(permissions) ||
+      file.write(data) != data.size() || !file.commit())
     fail("Could not write " + path);
   if (!QFile::setPermissions(path, permissions))
     fail("Could not secure " + path);
@@ -130,6 +134,8 @@ Generated generate(const Server &server, const Share &share) {
     options = values.join(',');
   }
   Generated result;
+  result.source = what;
+  result.type = type;
   result.shareId = share.id;
   result.localPath = share.localPath;
   auto escaped = escapePath(share.localPath);
@@ -181,6 +187,17 @@ QJsonArray loadManaged() {
       .toArray();
 }
 
+void verifyMount(const QJsonObject &record) {
+  QFile mounts("/proc/self/mountinfo");
+  if (!mounts.open(QIODevice::ReadOnly) ||
+      !mountIdentityMatches(mounts.readAll(), record["local_path"].toString(),
+                            record["source"].toString(),
+                            record["type"].toString(),
+                            !record["automount_unit"].toString().isEmpty()))
+    fail("Mount identity could not be verified; refusing to change this share. "
+         "Reapply legacy configurations first.");
+}
+
 void apply() {
   auto request = parseInput(),
        configObject = request.value("config").toObject(),
@@ -188,6 +205,24 @@ void apply() {
   AppConfig config = fromJson(configObject);
   QHash<QString, Server> servers;
   for (const auto &s : config.servers) {
+    if (!validId(s.id) || !validHost(s.hostname))
+      fail("Invalid server identity");
+    if (!QStringList{"3", "4", "4.0", "4.1", "4.2"}.contains(s.nfsVersion))
+      fail("Unsupported NFS version");
+    if (!QStringList{"default", "2.0", "2.1", "3", "3.0", "3.02", "3.1.1",
+                     "SMB2", "SMB3"}
+             .contains(s.smbVersion))
+      fail("Unsupported SMB version");
+    if (s.protocol == Protocol::Smb) {
+      auto c = credentials.value(s.id).toObject();
+      const auto user = c["username"].toString(),
+                 password = c["password"].toString(),
+                 domain = c["domain"].toString();
+      if (user != s.smbUsername || user.isEmpty() || password.isEmpty() ||
+          (user + password + domain)
+              .contains(QRegularExpression("[\\n\\r\\x00]")))
+        fail("Invalid or missing SMB credentials");
+    }
     if (servers.contains(s.id))
       fail("Duplicate server ID");
     servers[s.id] = s;
@@ -203,65 +238,145 @@ void apply() {
         fail("Share references missing server");
       generated << generate(servers[share.serverId], share);
     }
-  if (generated.isEmpty())
-    fail("No enabled shares configured");
   QSet<QString> newUnits;
   for (const auto &g : generated)
-    for (auto it = g.files.begin(); it != g.files.end(); ++it)
+    for (auto it = g.files.begin(); it != g.files.end(); ++it) {
+      if (newUnits.contains(it.key()))
+        fail("Two shares use the same mount destination");
       newUnits.insert(it.key());
-  for (const auto &v : loadManaged()) {
-    auto o = v.toObject();
-    for (const auto &name :
-         {o["mount_unit"].toString(), o["automount_unit"].toString()})
-      if (!name.isEmpty() && !newUnits.contains(name)) {
-        systemctl({"disable", "--now", name}, true);
-        QFile::remove(systemdDir + "/" + name);
-      }
-  }
-  QDir().mkpath(systemdDir);
-  QDir().mkpath(stateDir + "/credentials");
-  QFile::setPermissions(stateDir, QFileDevice::ReadOwner |
-                                      QFileDevice::WriteOwner |
-                                      QFileDevice::ExeOwner);
-  QFile::setPermissions(stateDir + "/credentials", QFileDevice::ReadOwner |
-                                                       QFileDevice::WriteOwner |
-                                                       QFileDevice::ExeOwner);
-  for (const auto &g : generated) {
-    QDir().mkpath(g.localPath);
-    for (auto it = g.files.begin(); it != g.files.end(); ++it)
-      writeFile(systemdDir + "/" + it.key(), it.value(),
-                QFileDevice::ReadOwner | QFileDevice::WriteOwner |
-                    QFileDevice::ReadGroup | QFileDevice::ReadOther);
-  }
-  for (const auto &s : config.servers)
-    if (s.protocol == Protocol::Smb) {
-      auto c = credentials.value(s.id).toObject();
-      auto user = c["username"].toString(), password = c["password"].toString(),
-           domain = c["domain"].toString();
-      if (user != s.smbUsername || user.isEmpty() || password.isEmpty() ||
-          (user + password + domain)
-              .contains(QRegularExpression("[\\n\\r\\x00]")))
-        fail("Invalid or missing SMB credentials");
-      QByteArray content = "username=" + user.toUtf8() +
-                           "\npassword=" + password.toUtf8() + "\n";
-      if (!domain.isEmpty())
-        content += "domain=" + domain.toUtf8() + "\n";
-      writeFile(stateDir + "/credentials/" + s.id + ".cred", content,
-                QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     }
-  systemctl({"daemon-reload"});
-  for (const auto &g : generated)
-    if (!g.enableUnit.isEmpty())
-      systemctl({"enable", "--now", g.enableUnit});
-  QJsonArray manifest;
-  for (const auto &g : generated)
-    manifest.append(QJsonObject{{"share_id", g.shareId},
-                                {"mount_unit", g.mountUnit},
-                                {"automount_unit", g.automountUnit}});
-  writeFile(manifestPath,
-            QJsonDocument(QJsonObject{{"shares", manifest}})
-                .toJson(QJsonDocument::Indented),
-            QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  const auto oldManifest = loadManaged();
+  // Check every target before any unit removal, directory creation, or write.
+  for (const auto &g : generated) {
+    QString path = QDir::cleanPath(g.localPath);
+    if (path == "/" || path == "/etc" || path == "/usr" || path == "/var" ||
+        path == "/home")
+      fail("Refusing a system directory as a mount destination");
+    while (path != "/") {
+      if (QFileInfo(path).isSymLink())
+        fail("Mount destinations must not traverse symlinks");
+      path = QFileInfo(path).absolutePath();
+    }
+    bool ownedAutomount = false;
+    for (const auto &old : oldManifest)
+      if (old.toObject()["local_path"].toString() == g.localPath &&
+          !old.toObject()["automount_unit"].toString().isEmpty())
+        ownedAutomount = true;
+    verifyMount(
+        QJsonObject{{"local_path", g.localPath},
+                    {"source", g.source},
+                    {"type", g.type},
+                    {"automount_unit", ownedAutomount ? "managed" : ""}});
+  }
+  QSet<QString> ownedUnits;
+  for (const auto &v : oldManifest) {
+    ownedUnits.insert(v.toObject()["mount_unit"].toString());
+    ownedUnits.insert(v.toObject()["automount_unit"].toString());
+  }
+  for (const auto &name : newUnits) {
+    if (!ownedUnits.contains(name) &&
+        (QFileInfo::exists(systemdDir + "/" + name) ||
+         QFileInfo::exists("/usr/lib/systemd/system/" + name) ||
+         QFileInfo::exists("/run/systemd/system/" + name)))
+      fail("Refusing to replace an unrelated systemd unit: " + name);
+  }
+  FileTransaction transaction;
+  transaction.capture(manifestPath);
+  for (const auto &name : ownedUnits)
+    if (!name.isEmpty())
+      transaction.capture(systemdDir + "/" + name);
+  for (const auto &name : newUnits)
+    transaction.capture(systemdDir + "/" + name);
+  for (const auto &server : config.servers)
+    if (server.protocol == Protocol::Smb)
+      transaction.capture(stateDir + "/credentials/" + server.id + ".cred");
+  try {
+    for (const auto &v : oldManifest) {
+      auto o = v.toObject();
+      for (const auto &name :
+           {o["mount_unit"].toString(), o["automount_unit"].toString()})
+        if (!name.isEmpty() && !newUnits.contains(name)) {
+          verifyMount(o);
+          // Stop before removal; enablement is reconciled after files commit.
+          systemctl({"stop", name});
+          if (QFile::exists(systemdDir + "/" + name) &&
+              !QFile::remove(systemdDir + "/" + name))
+            fail("Could not remove retired unit");
+        }
+    }
+    QDir().mkpath(systemdDir);
+    QDir().mkpath(stateDir + "/credentials");
+    QFile::setPermissions(stateDir, QFileDevice::ReadOwner |
+                                        QFileDevice::WriteOwner |
+                                        QFileDevice::ExeOwner);
+    QFile::setPermissions(stateDir + "/credentials",
+                          QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                              QFileDevice::ExeOwner);
+    for (const auto &g : generated) {
+      QDir().mkpath(g.localPath);
+      for (auto it = g.files.begin(); it != g.files.end(); ++it)
+        writeFile(systemdDir + "/" + it.key(), it.value(),
+                  QFileDevice::ReadOwner | QFileDevice::WriteOwner |
+                      QFileDevice::ReadGroup | QFileDevice::ReadOther);
+    }
+    for (const auto &s : config.servers)
+      if (s.protocol == Protocol::Smb) {
+        auto c = credentials.value(s.id).toObject();
+        auto user = c["username"].toString(),
+             password = c["password"].toString(),
+             domain = c["domain"].toString();
+        if (user != s.smbUsername || user.isEmpty() || password.isEmpty() ||
+            (user + password + domain)
+                .contains(QRegularExpression("[\\n\\r\\x00]")))
+          fail("Invalid or missing SMB credentials");
+        QByteArray content = "username=" + user.toUtf8() +
+                             "\npassword=" + password.toUtf8() + "\n";
+        if (!domain.isEmpty())
+          content += "domain=" + domain.toUtf8() + "\n";
+        writeFile(stateDir + "/credentials/" + s.id + ".cred", content,
+                  QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+      }
+    QJsonArray manifest;
+    for (const auto &g : generated)
+      manifest.append(QJsonObject{{"share_id", g.shareId},
+                                  {"local_path", g.localPath},
+                                  {"source", g.source},
+                                  {"type", g.type},
+                                  {"mount_unit", g.mountUnit},
+                                  {"automount_unit", g.automountUnit}});
+    writeFile(manifestPath,
+              QJsonDocument(QJsonObject{{"shares", manifest}})
+                  .toJson(QJsonDocument::Indented),
+              QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    // Persist ownership before activation: an offline server must not leave
+    // successfully installed units absent from the control manifest.
+    systemctl({"daemon-reload"});
+  } catch (const std::exception &error) {
+    const QString cause = QString::fromUtf8(error.what());
+    transaction.rollback();
+    systemctl({"daemon-reload"});
+    fail(cause + "\nConfiguration files restored. Previously stopped shares "
+                 "may need mounting again.");
+  }
+  for (const auto &name : ownedUnits)
+    if (!name.isEmpty() && !newUnits.contains(name))
+      systemctl({"disable", name}, true);
+  QStringList failures;
+  for (const auto &g : generated) {
+    try {
+      systemctl({"disable", g.mountUnit});
+      if (!g.automountUnit.isEmpty())
+        systemctl({"disable", g.automountUnit});
+      if (!g.enableUnit.isEmpty())
+        systemctl({"enable", "--now", g.enableUnit});
+    } catch (const std::exception &error) {
+      failures << QString::fromUtf8(error.what());
+    }
+  }
+  if (!failures.isEmpty())
+    fail("Configuration installed; some shares could not activate. Retry after "
+         "checking the server.\n" +
+         failures.join('\n'));
 }
 
 void control() {
@@ -269,10 +384,10 @@ void control() {
   auto action = request["action"].toString();
   if (action != "mount" && action != "unmount")
     fail("Invalid action");
-  QHash<QString, QString> managed;
+  QHash<QString, QJsonObject> managed;
   for (const auto &v : loadManaged()) {
     auto o = v.toObject();
-    managed[o["share_id"].toString()] = o["mount_unit"].toString();
+    managed[o["share_id"].toString()] = o;
   }
   auto ids = request["share_ids"].toArray();
   if (ids.isEmpty())
@@ -281,7 +396,13 @@ void control() {
     auto id = v.toString();
     if (!managed.contains(id))
       fail("Share is not in the root-owned manifest");
-    systemctl({action == "mount" ? "start" : "stop", managed[id]});
+    verifyMount(managed[id]);
+    if (action == "unmount" &&
+        !managed[id]["automount_unit"].toString().isEmpty())
+      systemctl({"stop", managed[id]["automount_unit"].toString()});
+    verifyMount(managed[id]);
+    systemctl({action == "mount" ? "start" : "stop",
+               managed[id]["mount_unit"].toString()});
   }
 }
 } // namespace
@@ -290,6 +411,11 @@ int main(int argc, char **argv) {
   QCoreApplication app(argc, argv);
   if (geteuid() != 0) {
     fprintf(stderr, "omamounter helper must run as root\n");
+    return 1;
+  }
+  QLockFile lock("/run/omamounter.lock");
+  if (!lock.tryLock(0)) {
+    fprintf(stderr, "Another omamounter operation is running\n");
     return 1;
   }
   try {

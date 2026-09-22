@@ -1,10 +1,12 @@
 #include "settingsdialog.h"
 #include "backends.h"
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QFileInfo>
 #include <QFormLayout>
+#include <QFutureWatcher>
 #include <QHBoxLayout>
 #include <QHostInfo>
 #include <QInputDialog>
@@ -15,6 +17,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTcpSocket>
@@ -22,6 +25,7 @@
 #include <QTimer>
 #include <QUuid>
 #include <QVBoxLayout>
+#include <QtConcurrent>
 #include <memory>
 
 SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
@@ -35,7 +39,7 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   auto *gf = new QFormLayout(g);
   m_root = new QLineEdit(c.mountRoot);
   gf->addRow("Default mount root", m_root);
-  auto *review = new QPushButton("Preview / apply system configuration");
+  auto *review = new QPushButton("Advanced: preview system configuration");
   connect(review, &QPushButton::clicked, this, &SettingsDialog::preview);
   gf->addRow("System integration", review);
   tabs->addTab(g, "General");
@@ -74,7 +78,6 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   auto *sb = new QHBoxLayout;
   for (auto pair : QList<QPair<QString, void (SettingsDialog::*)()>>{
            {"Add", &SettingsDialog::addServer},
-           {"Apply", &SettingsDialog::applyServer},
            {"Remove", &SettingsDialog::removeServer},
            {"Test", &SettingsDialog::testConnection},
            {"Discover", &SettingsDialog::discover}}) {
@@ -103,20 +106,29 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   tabs->addTab(hPage, "Shares");
   auto *buttons =
       new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
+  buttons->button(QDialogButtonBox::Save)->setText("Save & Apply");
   connect(buttons, &QDialogButtonBox::accepted, this,
           &SettingsDialog::saveAndAccept);
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   outer->addWidget(buttons);
   connect(&m_helper, &HelperClient::finished, this, [this](const QString &m) {
+    if (m_acceptAfterApply) {
+      m_acceptAfterApply = false;
+      accept();
+      return;
+    }
     QMessageBox::information(this, "Applied", m);
   });
   connect(&m_helper, &HelperClient::failed, this, [this](const QString &m) {
+    m_acceptAfterApply = false;
     QMessageBox::warning(this, "Apply failed", m);
   });
   rebuildServers();
   rebuildShares();
 }
 void SettingsDialog::rebuildServers() {
+  QSignalBlocker blocker(m_servers);
+  m_loadedServer = -1;
   int row = m_servers->currentRow();
   m_servers->clear();
   for (const auto &s : m_config.servers)
@@ -124,10 +136,17 @@ void SettingsDialog::rebuildServers() {
                        ")");
   if (!m_config.servers.isEmpty())
     m_servers->setCurrentRow(qBound(0, row, m_config.servers.size() - 1));
+  loadServer(m_servers->currentRow());
 }
 void SettingsDialog::loadServer(int row) {
   if (row < 0 || row >= m_config.servers.size())
     return;
+  if (m_loadedServer >= 0 && m_loadedServer != row && !applyServer()) {
+    QSignalBlocker blocker(m_servers);
+    m_servers->setCurrentRow(m_loadedServer);
+    return;
+  }
+  m_loadedServer = row;
   const auto &s = m_config.servers[row];
   m_name->setText(s.name);
   m_host->setText(s.hostname);
@@ -138,14 +157,18 @@ void SettingsDialog::loadServer(int row) {
   m_domain->setText(s.smbDomain);
   m_smbver->setText(s.smbVersion);
   m_options->setText(s.mountOptions);
-  m_password->setText(lookupPassword(s.id));
+  m_password->clear();
+  m_password->setPlaceholderText("Leave blank to keep saved password");
+  if (m_passwords.contains(s.id))
+    m_password->setText(m_passwords.value(s.id));
+  m_password->setModified(false);
 }
-void SettingsDialog::applyServer() {
-  int row = m_servers->currentRow();
+bool SettingsDialog::applyServer() {
+  int row = m_loadedServer;
   if (row < 0)
-    return;
+    return true;
   try {
-    auto &s = m_config.servers[row];
+    auto s = m_config.servers[row];
     s.name = m_name->text().trimmed();
     s.hostname = validateAddress(m_host->text());
     s.fallbackIp = m_fallback->text().trimmed();
@@ -158,22 +181,29 @@ void SettingsDialog::applyServer() {
     s.smbDomain = m_domain->text().trimmed();
     s.smbVersion = m_smbver->text().trimmed();
     s.mountOptions = validateMountOptions(m_options->text());
-    if (s.protocol == Protocol::Smb && !m_password->text().isEmpty() &&
-        !storePassword(s.id, m_password->text()))
-      throw std::runtime_error(
-          "Secret Service could not store the SMB password.");
-    rebuildServers();
+    if (s.protocol == Protocol::Smb && m_password->isModified()) {
+      m_passwords[s.id] = m_password->text();
+      m_passwordEdits.insert(s.id);
+      m_password->setModified(false);
+    }
+    m_config.servers[row] = s;
+    return true;
   } catch (const std::exception &e) {
     QMessageBox::warning(this, "Invalid server", e.what());
+    return false;
   }
 }
 void SettingsDialog::addServer() {
+  if (!collectSettings())
+    return;
   m_config.servers.append({QUuid::createUuid().toString(QUuid::WithoutBraces),
                            "New server", "server.local", "", Protocol::Nfs});
   rebuildServers();
   m_servers->setCurrentRow(m_config.servers.size() - 1);
 }
 void SettingsDialog::removeServer() {
+  if (!collectSettings())
+    return;
   int row = m_servers->currentRow();
   if (row < 0)
     return;
@@ -198,9 +228,22 @@ void SettingsDialog::rebuildShares() {
                   h.enabled ? "yes" : "no"};
     for (int i = 0; i < v.size(); ++i)
       m_shares->setItem(r, i, new QTableWidgetItem(v[i]));
+    m_shares->item(r, 0)->setFlags(m_shares->item(r, 0)->flags() &
+                                   ~Qt::ItemIsEditable);
+    auto *mode = new QComboBox;
+    mode->addItem("Manual", "disabled");
+    mode->addItem("At boot", "boot");
+    mode->addItem("On first access", "access");
+    mode->setCurrentIndex(mode->findData(automountName(h.automount)));
+    m_shares->setCellWidget(r, 4, mode);
+    auto *enabled = new QCheckBox;
+    enabled->setChecked(h.enabled);
+    m_shares->setCellWidget(r, 5, enabled);
   }
 }
 void SettingsDialog::addShare() {
+  if (!collectSettings())
+    return;
   if (m_config.servers.isEmpty())
     return;
   bool ok = false;
@@ -220,22 +263,26 @@ void SettingsDialog::addShare() {
   rebuildShares();
 }
 void SettingsDialog::removeShare() {
+  if (!collectSettings())
+    return;
   int row = m_shares->currentRow();
   if (row >= 0) {
     m_config.shares.removeAt(row);
     rebuildShares();
   }
 }
-QString SettingsDialog::lookupPassword(const QString &id) const {
+QString SettingsDialog::lookupPassword(const QString &id) {
   QProcess p;
   p.start("/usr/bin/secret-tool",
           {"lookup", "application", "omamounter", "server", id});
   if (!p.waitForFinished(3000) || p.exitCode() != 0)
     return {};
-  return QString::fromUtf8(p.readAllStandardOutput()).trimmed();
+  auto bytes = p.readAllStandardOutput();
+  if (bytes.endsWith('\n'))
+    bytes.chop(1);
+  return QString::fromUtf8(bytes);
 }
-bool SettingsDialog::storePassword(const QString &id,
-                                   const QString &password) const {
+bool SettingsDialog::storePassword(const QString &id, const QString &password) {
   QProcess p;
   p.start("/usr/bin/secret-tool", {"store", "--label=omamounter SMB password",
                                    "application", "omamounter", "server", id});
@@ -246,7 +293,8 @@ bool SettingsDialog::storePassword(const QString &id,
   return p.waitForFinished(5000) && p.exitCode() == 0;
 }
 void SettingsDialog::preview() {
-  applyServer();
+  if (!collectSettings())
+    return;
   QDialog d(this);
   d.setWindowTitle("System configuration preview");
   d.resize(760, 520);
@@ -263,37 +311,109 @@ void SettingsDialog::preview() {
   d.exec();
 }
 void SettingsDialog::applySystemd() {
-  QHash<QString, QString> passwords;
-  for (const auto &s : m_config.servers)
-    if (s.protocol == Protocol::Smb)
-      passwords[s.id] = lookupPassword(s.id);
-  m_helper.apply(m_config, passwords);
+  if (!collectSettings())
+    return;
+  withPasswords([this] { m_helper.apply(m_config, m_passwords); }, true);
 }
 void SettingsDialog::saveAndAccept() {
-  applyServer();
-  m_config.mountRoot = m_root->text().trimmed();
+  if (!collectSettings())
+    return;
+  withPasswords(
+      [this] {
+        // Save the desired state before invoking system integration, so a
+        // failed activation can be retried without losing share IDs and edited
+        // settings.
+        try {
+          ConfigStore().save(m_config);
+        } catch (const std::exception &error) {
+          QMessageBox::warning(this, "Save failed", error.what());
+          return;
+        }
+        m_acceptAfterApply = true;
+        m_helper.apply(m_config, m_passwords);
+      },
+      true);
+}
+
+void SettingsDialog::withPasswords(std::function<void()> next, bool persist) {
+  if (m_secretBusy)
+    return;
+  QStringList ids;
+  for (const auto &server : m_config.servers)
+    if (server.protocol == Protocol::Smb)
+      ids << server.id;
+  if (ids.isEmpty()) {
+    next();
+    return;
+  }
+  m_secretBusy = true;
+  setEnabled(false);
+  using Result = QPair<QHash<QString, QString>, QString>;
+  auto *watcher = new QFutureWatcher<Result>(this);
+  connect(watcher, &QFutureWatcher<Result>::finished, this,
+          [this, watcher, next, persist] {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            m_secretBusy = false;
+            setEnabled(true);
+            if (!result.second.isEmpty()) {
+              QMessageBox::warning(this, "Password storage", result.second);
+              return;
+            }
+            m_passwords = result.first;
+            if (persist)
+              m_passwordEdits.clear();
+            next();
+          });
+  watcher->setFuture(QtConcurrent::run([ids, cached = m_passwords,
+                                        edits = m_passwordEdits,
+                                        persist]() mutable -> Result {
+    for (const auto &id : ids) {
+      if (!cached.contains(id))
+        cached[id] = lookupPassword(id);
+      if (persist && edits.contains(id) && !storePassword(id, cached.value(id)))
+        return {cached, "Secret Service could not store the SMB password. "
+                        "Unlock your keyring and try again."};
+    }
+    return {cached, {}};
+  }));
+}
+bool SettingsDialog::collectSettings() {
+  if (!applyServer())
+    return false;
+  auto next = m_config;
+  next.mountRoot = m_root->text().trimmed();
   try {
-    validateAbsolutePath(m_config.mountRoot);
+    validateAbsolutePath(next.mountRoot);
     for (int r = 0; r < m_shares->rowCount() && r < m_config.shares.size();
          ++r) {
-      auto &h = m_config.shares[r];
+      auto &h = next.shares[r];
       h.name = m_shares->item(r, 1)->text();
       h.remotePath = m_shares->item(r, 2)->text();
       h.localPath = validateAbsolutePath(m_shares->item(r, 3)->text());
-      auto mode = m_shares->item(r, 4)->text().toLower();
+      auto mode = qobject_cast<QComboBox *>(m_shares->cellWidget(r, 4))
+                      ->currentData()
+                      .toString();
+      if (mode != "boot" && mode != "access" && mode != "disabled")
+        throw std::invalid_argument(
+            "Mount mode must be disabled, boot, or access.");
       h.automount = mode == "boot"     ? AutomountMode::Boot
                     : mode == "access" ? AutomountMode::Access
                                        : AutomountMode::Disabled;
-      h.enabled = m_shares->item(r, 5)->text().toLower() != "no";
+      h.enabled =
+          qobject_cast<QCheckBox *>(m_shares->cellWidget(r, 5))->isChecked();
     }
-    accept();
+    m_config = next;
+    return true;
   } catch (const std::exception &e) {
     QMessageBox::warning(this, "Invalid settings", e.what());
+    return false;
   }
 }
 
 void SettingsDialog::testConnection() {
-  applyServer();
+  if (!applyServer())
+    return;
   int row = m_servers->currentRow();
   if (row < 0)
     return;
@@ -343,7 +463,8 @@ void SettingsDialog::testConnection() {
 }
 
 void SettingsDialog::discover() {
-  applyServer();
+  if (!collectSettings())
+    return;
   int row = m_servers->currentRow();
   if (row < 0)
     return;
@@ -364,13 +485,18 @@ void SettingsDialog::discover() {
 
 void SettingsDialog::runDiscovery(const Server &server,
                                   const QString &address) {
+  if (server.protocol == Protocol::Smb && !m_passwords.contains(server.id)) {
+    withPasswords([this, server, address] { runDiscovery(server, address); },
+                  false);
+    return;
+  }
   auto *process = new QProcess(this);
   QStringList arguments;
   QTemporaryFile *credentials = nullptr;
   if (server.protocol == Protocol::Nfs)
     arguments = {"--exports", address};
   else {
-    auto password = lookupPassword(server.id);
+    auto password = m_passwords.value(server.id);
     if (password.isEmpty()) {
       QMessageBox::warning(this, "Discovery failed",
                            "Save an SMB password first.");

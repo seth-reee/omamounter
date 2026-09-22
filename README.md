@@ -46,9 +46,14 @@ Each share supports one of three mounting modes:
 - **Boot** — mount it automatically when the system starts
 - **Access** — connect when its local directory is first accessed
 
-Use **Preview / apply system configuration** after changing shares or automatic
+Use **Save & Apply** after changing shares or automatic
 mounting preferences. Applying system configuration requires administrator
 authorization. Routine mount and unmount operations do not.
+
+Unit details are available under **Advanced: preview system configuration**.
+If installation fails, omamounter attempts to restore the previous configuration
+files. Shares stopped during recovery may need mounting again. If a server is
+offline after installation, the configuration stays saved so mounting can be retried.
 
 ## Security
 

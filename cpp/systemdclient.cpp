@@ -74,16 +74,20 @@ void HelperClient::start(const QString &program, const QJsonObject &request) {
     else
       emit failed(err.isEmpty() ? "Operation failed or was cancelled." : err);
   });
+  connect(m_process, &QProcess::started, this, [this, request] {
+    m_process->write(QJsonDocument(request).toJson(QJsonDocument::Compact));
+    m_process->closeWriteChannel();
+  });
+  connect(m_process, &QProcess::errorOccurred, this,
+          [this](QProcess::ProcessError error) {
+            if (error != QProcess::FailedToStart || !m_process)
+              return;
+            auto message = m_process->errorString();
+            m_process->deleteLater();
+            m_process = nullptr;
+            emit failed(message);
+          });
   m_process->start("/usr/bin/pkexec", {program});
-  if (!m_process->waitForStarted(3000)) {
-    auto e = m_process->errorString();
-    m_process->deleteLater();
-    m_process = nullptr;
-    emit failed(e);
-    return;
-  }
-  m_process->write(QJsonDocument(request).toJson(QJsonDocument::Compact));
-  m_process->closeWriteChannel();
 }
 void HelperClient::apply(const AppConfig &c,
                          const QHash<QString, QString> &passwords) {

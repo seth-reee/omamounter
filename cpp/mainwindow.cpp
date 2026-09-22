@@ -1,13 +1,16 @@
 #include "mainwindow.h"
 #include "backends.h"
+#include "mountidentity.h"
 #include "settingsdialog.h"
 #include <QCheckBox>
+#include <QFile>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTableWidget>
+#include <QTimer>
 #include <QVBoxLayout>
 
 MainWindow::MainWindow(AppConfig c, ConfigStore s)
@@ -50,9 +53,21 @@ MainWindow::MainWindow(AppConfig c, ConfigStore s)
     QMessageBox::warning(this, "Operation failed", e);
   });
   refresh();
+  auto *timer = new QTimer(this);
+  connect(timer, &QTimer::timeout, this, &MainWindow::refresh);
+  timer->start(3000);
 }
 void MainWindow::refresh() {
-  auto active = mountedPaths();
+  QHash<QString, bool> selected;
+  for (int r = 0; r < m_table->rowCount(); ++r) {
+    auto *check = qobject_cast<QCheckBox *>(m_table->cellWidget(r, 0));
+    if (check)
+      selected.insert(check->property("shareId").toString(),
+                      check->isChecked());
+  }
+  QFile mounts("/proc/self/mountinfo");
+  const bool readable = mounts.open(QIODevice::ReadOnly);
+  const auto mountinfo = readable ? mounts.readAll() : QByteArray();
   m_table->setRowCount(0);
   int mounted = 0;
   for (const auto &h : m_config.shares) {
@@ -63,16 +78,24 @@ void MainWindow::refresh() {
     int r = m_table->rowCount();
     m_table->insertRow(r);
     auto *c = new QCheckBox;
-    c->setChecked(h.enabled);
+    c->setChecked(selected.value(h.id, h.enabled));
     c->setProperty("shareId", h.id);
     m_table->setCellWidget(r, 0, c);
-    QStringList v{it->name,
-                  h.name,
-                  protocolName(it->protocol).toUpper(),
-                  h.remotePath,
-                  h.localPath,
-                  active.contains(h.localPath) ? "Mounted" : "Unmounted"};
-    if (active.contains(h.localPath))
+    QStringList sources;
+    for (const auto &host : {it->hostname, it->fallbackIp}) {
+      if (!host.isEmpty())
+        sources << (it->protocol == Protocol::Nfs
+                        ? host + ":" + h.remotePath
+                        : "//" + host + "/" + h.remotePath);
+    }
+    const auto status =
+        readable ? mountStatus(mountinfo, h.localPath, sources,
+                               it->protocol == Protocol::Nfs ? "nfs" : "cifs")
+                 : "Unknown";
+    QStringList v{
+        it->name,     h.name,      protocolName(it->protocol).toUpper(),
+        h.remotePath, h.localPath, status};
+    if (status == "Mounted")
       mounted++;
     for (int i = 0; i < v.size(); ++i)
       m_table->setItem(r, i + 1, new QTableWidgetItem(v[i]));

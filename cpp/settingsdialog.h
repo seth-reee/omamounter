@@ -2,6 +2,7 @@
 #include "config.h"
 #include "systemdclient.h"
 #include <QDialog>
+#include <functional>
 class QComboBox;
 class QLineEdit;
 class QListWidget;
@@ -14,7 +15,7 @@ public:
   AppConfig config() const { return m_config; }
 private slots:
   void loadServer(int);
-  void applyServer();
+  bool applyServer();
   void addServer();
   void removeServer();
   void addShare();
@@ -26,12 +27,19 @@ private slots:
   void discover();
 
 private:
+  Q_INVOKABLE bool collectSettings();
   void rebuildServers();
   void rebuildShares();
-  QString lookupPassword(const QString &) const;
-  bool storePassword(const QString &, const QString &) const;
+  static QString lookupPassword(const QString &);
+  static bool storePassword(const QString &, const QString &);
+  void withPasswords(std::function<void()> next, bool persist);
+  QHash<QString, QString> m_passwords;
+  QSet<QString> m_passwordEdits;
+  bool m_secretBusy = false;
+  bool m_acceptAfterApply = false;
   void runDiscovery(const Server &, const QString &);
   AppConfig m_config;
+  int m_loadedServer = -1;
   QListWidget *m_servers;
   QTableWidget *m_shares;
   QLineEdit *m_root, *m_name, *m_host, *m_fallback, *m_nfs, *m_user, *m_domain,
