@@ -91,6 +91,8 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   auto *hPage = new QWidget;
   auto *hl = new QVBoxLayout(hPage);
   m_shares = new QTableWidget(0, 6);
+  m_shares->setSelectionBehavior(QAbstractItemView::SelectRows);
+  m_shares->setSelectionMode(QAbstractItemView::ExtendedSelection);
   m_shares->setHorizontalHeaderLabels(
       {"Server", "Name", "Remote path", "Local path", "Automount", "Enabled"});
   hl->addWidget(m_shares);
@@ -107,6 +109,29 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   auto *buttons =
       new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
   buttons->button(QDialogButtonBox::Save)->setText("Save & Apply");
+  auto *about = buttons->addButton("About", QDialogButtonBox::HelpRole);
+  about->setObjectName("aboutButton");
+  connect(about, &QPushButton::clicked, this, [this] {
+    auto *popup = new QMessageBox(this);
+    popup->setObjectName("aboutDialog");
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setWindowTitle("About omamounter");
+    popup->setTextFormat(Qt::RichText);
+    popup->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    popup->setText(
+        "<h3>omamounter</h3>"
+        "<p>A lightweight desktop manager for NFS and SMB network shares "
+        "on Omarchy Linux.</p>"
+        "<p>Created by <b>Seth_Reee</b><br>"
+        "<a href=\"https://github.com/seth-reee\">GitHub: seth-reee</a><br>"
+        "<a href=\"https://github.com/seth-reee/omamounter\">Project repository</a></p>"
+        "<p>Licensed under the MIT License.</p>");
+    // Use the application's icon automatically once one is supplied.
+    if (!windowIcon().isNull())
+      popup->setIconPixmap(windowIcon().pixmap(64, 64));
+    popup->setStandardButtons(QMessageBox::Ok);
+    popup->open();
+  });
   connect(buttons, &QDialogButtonBox::accepted, this,
           &SettingsDialog::saveAndAccept);
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
@@ -269,12 +294,17 @@ void SettingsDialog::addShare() {
   rebuildShares();
 }
 void SettingsDialog::removeShare() {
-  if (!collectSettings())
+  auto rows = m_shares->selectionModel()->selectedRows();
+  if (rows.isEmpty())
     return;
-  int row = m_shares->currentRow();
-  if (row >= 0) {
-    m_config.shares.removeAt(row);
-    rebuildShares();
+  // Discard selected rows before validating; invalid entries must also be
+  // removable. Descending order preserves the remaining row-to-share mapping.
+  std::sort(rows.begin(), rows.end(), [](const QModelIndex &a, const QModelIndex &b) {
+    return a.row() > b.row();
+  });
+  for (const auto &row : rows) {
+    m_config.shares.removeAt(row.row());
+    m_shares->removeRow(row.row());
   }
 }
 QString SettingsDialog::lookupPassword(const QString &id) {
@@ -346,7 +376,8 @@ void SettingsDialog::withPasswords(std::function<void()> next, bool persist) {
     return;
   QStringList ids;
   for (const auto &server : m_config.servers)
-    if (server.protocol == Protocol::Smb)
+    if (server.protocol == Protocol::Smb &&
+        (!persist || serverHasEnabledShares(m_config, server.id)))
       ids << server.id;
   if (ids.isEmpty()) {
     next();
@@ -357,7 +388,7 @@ void SettingsDialog::withPasswords(std::function<void()> next, bool persist) {
   using Result = QPair<QHash<QString, QString>, QString>;
   auto *watcher = new QFutureWatcher<Result>(this);
   connect(watcher, &QFutureWatcher<Result>::finished, this,
-          [this, watcher, next, persist] {
+          [this, watcher, next, persist, ids] {
             const auto result = watcher->result();
             watcher->deleteLater();
             m_secretBusy = false;
@@ -368,7 +399,8 @@ void SettingsDialog::withPasswords(std::function<void()> next, bool persist) {
             }
             m_passwords = result.first;
             if (persist)
-              m_passwordEdits.clear();
+              for (const auto &id : ids)
+                m_passwordEdits.remove(id);
             next();
           });
   watcher->setFuture(QtConcurrent::run([ids, cached = m_passwords,

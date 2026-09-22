@@ -79,6 +79,35 @@ private slots:
     QVERIFY(!read(systemdDir + "/" + unit()).contains("test-only-secret"));
     QVERIFY(!(QFile::permissions(path) & (QFileDevice::ReadGroup | QFileDevice::ReadOther)));
   }
+  void removeAllSmbSharesWithoutCredentials() {
+    config.servers[0].protocol = Protocol::Smb;
+    config.servers[0].smbUsername = "tester";
+    config.shares[0].remotePath = "Media";
+    config.shares[0].automount = AutomountMode::Access;
+    testRequest = {{"config", toJson(config)}, {"credentials", QJsonObject{
+      {config.servers[0].id, QJsonObject{{"username", "tester"}, {"password", "test-secret"}}}}}};
+    apply();
+    const auto mount = unit();
+    const auto automatic = escapePath(config.shares[0].localPath) + ".automount";
+    config.shares.clear();
+    testCommands.clear();
+    requestApply();
+    QVERIFY(loadManaged().isEmpty());
+    QVERIFY(!QFile::exists(systemdDir + "/" + mount));
+    QVERIFY(!QFile::exists(systemdDir + "/" + automatic));
+    QVERIFY(testCommands.indexOf("stop " + automatic) >= 0);
+    QVERIFY(testCommands.indexOf("stop " + automatic) < testCommands.indexOf("stop " + mount));
+    config.servers.clear();
+    requestApply();
+    QVERIFY(loadManaged().isEmpty());
+  }
+  void disabledSmbSharesNeedNoCredentials() {
+    config.servers[0].protocol = Protocol::Smb;
+    config.shares[0].enabled = false;
+    requestApply();
+    QVERIFY(loadManaged().isEmpty());
+    QVERIFY(!QFile::exists(stateDir + "/credentials/" + config.servers[0].id + ".cred"));
+  }
 };
 QTEST_GUILESS_MAIN(HelperIntegration)
 #include "helper_integration.moc"

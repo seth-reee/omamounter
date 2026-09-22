@@ -67,7 +67,13 @@ MainWindow::MainWindow(AppConfig c, ConfigStore s)
   timer->start(3000);
 }
 void MainWindow::refresh() {
-  m_welcome->setVisible(m_config.servers.isEmpty());
+  m_welcome->setVisible(m_config.shares.isEmpty());
+  m_welcome->findChild<QLabel *>()->setText(
+      m_config.servers.isEmpty()
+          ? "No servers configured. Add a server to get started."
+          : "No shares configured. Open Settings to discover or add shares.");
+  m_welcome->findChild<QPushButton *>()->setText(
+      m_config.servers.isEmpty() ? "Add server" : "Add shares");
   QHash<QString, bool> selected;
   for (int r = 0; r < m_table->rowCount(); ++r) {
     auto *check = qobject_cast<QCheckBox *>(m_table->cellWidget(r, 0));

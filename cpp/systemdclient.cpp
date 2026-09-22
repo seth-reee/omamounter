@@ -93,7 +93,7 @@ void HelperClient::apply(const AppConfig &c,
                          const QHash<QString, QString> &passwords) {
   QJsonObject credentials;
   for (const auto &s : c.servers)
-    if (s.protocol == Protocol::Smb)
+    if (s.protocol == Protocol::Smb && serverHasEnabledShares(c, s.id))
       credentials[s.id] = QJsonObject{{"username", s.smbUsername},
                                       {"password", passwords.value(s.id)},
                                       {"domain", s.smbDomain}};

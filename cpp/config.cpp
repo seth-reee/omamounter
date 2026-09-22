@@ -87,6 +87,12 @@ AppConfig defaultConfig() {
   c.mountRoot = QDir::homePath() + "/Mount";
   return c;
 }
+bool serverHasEnabledShares(const AppConfig &config, const QString &serverId) {
+  for (const auto &share : config.shares)
+    if (share.enabled && share.serverId == serverId)
+      return true;
+  return false;
+}
 
 ConfigStore::ConfigStore(QString path) : m_path(std::move(path)) {
   if (m_path.isEmpty())

@@ -244,7 +244,7 @@ void apply() {
                      "SMB2", "SMB3"}
              .contains(s.smbVersion))
       fail("Unsupported SMB version");
-    if (s.protocol == Protocol::Smb) {
+    if (s.protocol == Protocol::Smb && serverHasEnabledShares(config, s.id)) {
       auto c = credentials.value(s.id).toObject();
       const auto user = c["username"].toString(),
                  password = c["password"].toString(),
@@ -319,13 +319,13 @@ void apply() {
   for (const auto &name : newUnits)
     transaction.capture(systemdDir + "/" + name);
   for (const auto &server : config.servers)
-    if (server.protocol == Protocol::Smb)
+    if (server.protocol == Protocol::Smb && serverHasEnabledShares(config, server.id))
       transaction.capture(stateDir + "/credentials/" + server.id + ".cred");
   try {
     for (const auto &v : oldManifest) {
       auto o = v.toObject();
       for (const auto &name :
-           {o["mount_unit"].toString(), o["automount_unit"].toString()})
+           {o["automount_unit"].toString(), o["mount_unit"].toString()})
         if (!name.isEmpty() && !newUnits.contains(name)) {
           verifyMount(o);
           // Stop before removal; enablement is reconciled after files commit.
@@ -351,7 +351,7 @@ void apply() {
                       QFileDevice::ReadGroup | QFileDevice::ReadOther);
     }
     for (const auto &s : config.servers)
-      if (s.protocol == Protocol::Smb) {
+      if (s.protocol == Protocol::Smb && serverHasEnabledShares(config, s.id)) {
         auto c = credentials.value(s.id).toObject();
         auto user = c["username"].toString(),
              password = c["password"].toString(),

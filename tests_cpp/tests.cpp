@@ -9,6 +9,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QPushButton>
+#include <QMessageBox>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QtTest>
@@ -16,6 +17,40 @@
 class Tests : public QObject {
   Q_OBJECT
 private slots:
+  void removeAllShares() {
+    auto config = sampleConfig();
+    auto second = config.shares[0];
+    second.id = "second";
+    config.shares.append(second);
+    SettingsDialog dialog(config);
+    auto *table = dialog.findChild<QTableWidget *>();
+    table->item(0, 3)->setText("invalid path");
+    table->selectAll();
+    QVERIFY(QMetaObject::invokeMethod(&dialog, "removeShare", Qt::DirectConnection));
+    QCOMPARE(table->rowCount(), 0);
+    QVERIFY(dialog.config().shares.isEmpty());
+    bool collected = false;
+    QVERIFY(QMetaObject::invokeMethod(&dialog, "collectSettings",
+        Qt::DirectConnection, Q_RETURN_ARG(bool, collected)));
+    QVERIFY(collected);
+    QCOMPARE(dialog.config().servers.size(), 1);
+    MainWindow window(dialog.config(), ConfigStore("/unused/test-config"));
+    QVERIFY(!window.findChild<QWidget *>("welcome")->isHidden());
+    QCOMPARE(window.findChild<QPushButton *>("addServer")->text(), QString("Add shares"));
+  }
+  void aboutPopup() {
+    SettingsDialog dialog(defaultConfig());
+    auto *button = dialog.findChild<QPushButton *>("aboutButton");
+    QVERIFY(button);
+    button->click();
+    auto *popup = dialog.findChild<QMessageBox *>("aboutDialog");
+    QVERIFY(popup);
+    QVERIFY(popup->text().contains("Seth_Reee"));
+    QVERIFY(popup->text().contains("https://github.com/seth-reee"));
+    QVERIFY(popup->text().contains("NFS and SMB"));
+    popup->accept();
+    QVERIFY(dialog.config().servers.isEmpty());
+  }
   void failedWriteRecovery() {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());

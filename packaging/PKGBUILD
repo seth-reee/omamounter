@@ -1,5 +1,5 @@
 pkgname=omamounter
-pkgver=0.2.2
+pkgver=0.2.3
 pkgrel=1
 pkgdesc='Native Qt manager for NFS and SMB network shares'
 arch=('x86_64')

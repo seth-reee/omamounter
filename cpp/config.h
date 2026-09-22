@@ -32,6 +32,7 @@ QString automountName(AutomountMode value);
 QJsonObject toJson(const AppConfig &config);
 AppConfig fromJson(const QJsonObject &object);
 AppConfig defaultConfig();
+bool serverHasEnabledShares(const AppConfig &, const QString &serverId);
 
 class ConfigStore {
 public:
