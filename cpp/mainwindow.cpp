@@ -23,6 +23,15 @@ MainWindow::MainWindow(AppConfig c, ConfigStore s)
   t->setObjectName("title");
   l->addWidget(t);
   l->addWidget(new QLabel("Network share manager"));
+  m_welcome = new QWidget;
+  m_welcome->setObjectName("welcome");
+  auto *welcomeLayout = new QVBoxLayout(m_welcome);
+  welcomeLayout->addWidget(new QLabel("No servers configured. Add a server to get started."));
+  auto *addServer = new QPushButton("Add server");
+  addServer->setObjectName("addServer");
+  welcomeLayout->addWidget(addServer);
+  connect(addServer, &QPushButton::clicked, this, &MainWindow::settings);
+  l->addWidget(m_welcome);
   m_table = new QTableWidget(0, 7);
   m_table->setHorizontalHeaderLabels({"", "Server", "Share", "Protocol",
                                       "Remote path", "Mount destination",
@@ -58,6 +67,7 @@ MainWindow::MainWindow(AppConfig c, ConfigStore s)
   timer->start(3000);
 }
 void MainWindow::refresh() {
+  m_welcome->setVisible(m_config.servers.isEmpty());
   QHash<QString, bool> selected;
   for (int r = 0; r < m_table->rowCount(); ++r) {
     auto *check = qobject_cast<QCheckBox *>(m_table->cellWidget(r, 0));
@@ -106,6 +116,8 @@ void MainWindow::refresh() {
 }
 void MainWindow::settings() {
   SettingsDialog d(m_config, this);
+  if (m_config.servers.isEmpty())
+    d.beginAddServer();
   if (d.exec() == QDialog::Accepted) {
     m_config = d.config();
     try {

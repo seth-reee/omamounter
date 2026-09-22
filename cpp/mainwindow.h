@@ -19,5 +19,6 @@ private:
   ConfigStore m_store;
   QTableWidget *m_table;
   QLabel *m_summary;
+  QWidget *m_welcome;
   HelperClient m_helper;
 };

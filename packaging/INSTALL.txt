@@ -1,0 +1,19 @@
+omamounter manual binary installation (Arch Linux x86_64)
+
+Prefer the .pkg.tar.zst package: sudo pacman -U omamounter-*.pkg.tar.zst
+
+For the binary tarball, install runtime dependencies:
+  sudo pacman -S qt6-base libsecret polkit nfs-utils cifs-utils smbclient
+
+From the extracted directory, install the application and authorization helpers:
+  sudo install -Dm755 usr/bin/omamounter /usr/bin/omamounter
+  sudo install -Dm755 usr/lib/omamounter/omamounter-apply-helper /usr/lib/omamounter/omamounter-apply-helper
+  sudo install -Dm755 usr/lib/omamounter/omamounter-control-helper /usr/lib/omamounter/omamounter-control-helper
+  sudo install -Dm644 usr/share/applications/omamounter.desktop /usr/share/applications/omamounter.desktop
+  sudo install -Dm644 usr/share/polkit-1/actions/org.omamounter.policy /usr/share/polkit-1/actions/org.omamounter.policy
+  sudo install -Dm644 usr/share/licenses/omamounter/LICENSE /usr/share/licenses/omamounter/LICENSE
+
+Run omamounter as your normal desktop user, never with sudo.
+Choose Add server to configure your first connection.
+These binaries require Arch's system Qt libraries; they are not standalone.
+Do not mix manual installation with a pacman-managed installation.

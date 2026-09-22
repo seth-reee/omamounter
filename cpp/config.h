@@ -31,7 +31,7 @@ QString protocolName(Protocol value);
 QString automountName(AutomountMode value);
 QJsonObject toJson(const AppConfig &config);
 AppConfig fromJson(const QJsonObject &object);
-AppConfig importedDefaults();
+AppConfig defaultConfig();
 
 class ConfigStore {
 public:

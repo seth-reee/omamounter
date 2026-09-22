@@ -197,9 +197,15 @@ void SettingsDialog::addServer() {
   if (!collectSettings())
     return;
   m_config.servers.append({QUuid::createUuid().toString(QUuid::WithoutBraces),
-                           "New server", "server.local", "", Protocol::Nfs});
+                           "New server", "", "", Protocol::Nfs});
   rebuildServers();
   m_servers->setCurrentRow(m_config.servers.size() - 1);
+  m_host->setPlaceholderText("Hostname or IP address");
+  m_host->setFocus();
+}
+void SettingsDialog::beginAddServer() {
+  findChild<QTabWidget *>()->setCurrentIndex(1);
+  addServer();
 }
 void SettingsDialog::removeServer() {
   if (!collectSettings())

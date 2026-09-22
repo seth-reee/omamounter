@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(omamounter VERSION 0.2.1 LANGUAGES CXX)
+project(omamounter VERSION 0.2.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,7 +44,7 @@ add_executable(helper_integration tests_cpp/helper_integration.cpp cpp/config.cp
 target_include_directories(helper_integration PRIVATE cpp)
 target_link_libraries(helper_integration PRIVATE Qt6::Core Qt6::Test)
 add_test(NAME helper_integration COMMAND helper_integration)
-add_executable(omamounter_tests tests_cpp/tests.cpp cpp/settingsdialog.cpp cpp/settingsdialog.h)
+add_executable(omamounter_tests tests_cpp/tests.cpp cpp/settingsdialog.cpp cpp/settingsdialog.h cpp/mainwindow.cpp cpp/mainwindow.h)
 target_link_libraries(omamounter_tests PRIVATE omamounter_core Qt6::Test Qt6::Concurrent)
 add_test(NAME omamounter_tests COMMAND omamounter_tests)
 set_tests_properties(omamounter_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

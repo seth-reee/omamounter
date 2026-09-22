@@ -1,11 +1,15 @@
 #include "backends.h"
 #include "config.h"
+#include "fixtures.h"
+#include "mainwindow.h"
 #include "filetransaction.h"
 #include "mountidentity.h"
 #include "settingsdialog.h"
 #include "systemdclient.h"
 #include <QCheckBox>
 #include <QComboBox>
+#include <QPushButton>
+#include <QTabWidget>
 #include <QTableWidget>
 #include <QtTest>
 
@@ -52,7 +56,7 @@ private slots:
              QString("Unmounted"));
   }
   void settingsControlsPersist() {
-    SettingsDialog dialog(importedDefaults());
+    SettingsDialog dialog(sampleConfig());
     auto *table = dialog.findChild<QTableWidget *>();
     QVERIFY(table);
     auto *mode = qobject_cast<QComboBox *>(table->cellWidget(0, 4));
@@ -100,21 +104,43 @@ private slots:
         "/mnt/My Share", "//nas/My Share", "cifs", false));
   }
   void defaults() {
-    auto c = importedDefaults();
-    QCOMPARE(c.servers.size(), 1);
-    QCOMPARE(c.shares.size(), 9);
-    QCOMPARE(c.servers[0].hostname, QString("sakuya.weeb"));
-    QCOMPARE(c.shares[0].remotePath, QString("/volume1/Usenet"));
+    QTemporaryDir dir;
+    ConfigStore store(dir.filePath("config.json"));
+    auto c = store.load();
+    QVERIFY(c.servers.isEmpty());
+    QVERIFY(c.shares.isEmpty());
+    QCOMPARE(c.mountRoot, QDir::homePath() + "/Mount");
+    QVERIFY(!QFile::exists(store.path()));
+    store.save(sampleConfig());
+    QCOMPARE(toJson(store.load()), toJson(sampleConfig()));
+    store.save(defaultConfig());
+    QVERIFY(store.load().servers.isEmpty());
+  }
+  void firstRunPrompt() {
+    QTemporaryDir dir;
+    MainWindow window(defaultConfig(), ConfigStore(dir.filePath("config.json")));
+    QVERIFY(!window.findChild<QWidget *>("welcome")->isHidden());
+    QVERIFY(window.findChild<QPushButton *>("addServer"));
+    SettingsDialog dialog(defaultConfig());
+    dialog.beginAddServer();
+    QCOMPARE(dialog.findChild<QTabWidget *>()->currentIndex(), 1);
+    QCOMPARE(dialog.config().servers.size(), 1);
+    QVERIFY(dialog.config().servers[0].hostname.isEmpty());
+    QVERIFY(dialog.config().shares.isEmpty());
+    dialog.reject();
+    QVERIFY(!QFile::exists(dir.filePath("config.json")));
+    MainWindow configured(sampleConfig(), ConfigStore(dir.filePath("config.json")));
+    QVERIFY(configured.findChild<QWidget *>("welcome")->isHidden());
   }
   void nfsCommand() {
-    auto c = importedDefaults();
-    QCOMPARE(nfsMountCommand(c.servers[0], c.shares[1], "sakuya.weeb"),
-             QStringList({"mount", "-t", "nfs", "sakuya.weeb:/volume1/Anime",
-                          "/home/seth/Mount/Anime", "-o", "nfsvers=4"}));
+    auto c = sampleConfig();
+    QCOMPARE(nfsMountCommand(c.servers[0], c.shares[0], "nas.example"),
+             QStringList({"mount", "-t", "nfs", "nas.example:/exports/media",
+                          "/mnt/test/Media", "-o", "nfsvers=4"}));
   }
   void parsers() {
-    QCOMPARE(parseNfsExports("Export list for host:\n/volume1/Anime *\n"),
-             QStringList{"/volume1/Anime"});
+    QCOMPARE(parseNfsExports("Export list for host:\n/exports/media *\n"),
+             QStringList{"/exports/media"});
     QCOMPARE(parseSmbShares("Disk|Media|Films\nIPC|IPC$|\n"),
              QStringList{"Media"});
   }
@@ -122,10 +148,10 @@ private slots:
     QCOMPARE(systemdEscapePath("/mnt/TV-Shows"), QString("mnt-TV\\x2dShows"));
   }
   void configRoundTrip() {
-    auto c = importedDefaults();
+    auto c = sampleConfig();
     auto r = fromJson(toJson(c));
-    QCOMPARE(r.shares.size(), 9);
-    QCOMPARE(r.servers[0].fallbackIp, QString("192.168.100.11"));
+    QCOMPARE(r.shares.size(), 1);
+    QCOMPARE(r.servers[0].fallbackIp, QString("192.0.2.10"));
   }
 };
 QTEST_MAIN(Tests)

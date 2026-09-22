@@ -28,6 +28,10 @@ Download the latest Arch package from the project releases and install it with:
 sudo pacman -U omamounter-*.pkg.tar.zst
 ```
 
+For manual installation, extract the binary tarball and follow its
+`INSTALL.txt`. It includes the application and required authorization helpers;
+Qt and protocol tools are system dependencies.
+
 After installation, launch **omamounter** from the application menu or run:
 
 ```bash
@@ -36,15 +40,18 @@ omamounter
 
 ## Usage
 
-Open **Settings** to add a server, choose NFS or SMB, test the connection, and
+On first launch, choose **Add server**. No servers or shares are preconfigured;
+the default mount root is `~/Mount`. Existing saved settings are preserved on upgrade.
+
+Open **Settings** to add more servers, choose NFS or SMB, test the connection, and
 discover its shares. Shares can also be added manually when discovery is not
 available.
 
 Each share supports one of three mounting modes:
 
-- **Disabled** — mount and unmount it manually from the main window
-- **Boot** — mount it automatically when the system starts
-- **Access** — connect when its local directory is first accessed
+- **Manual** — mount and unmount it manually from the main window
+- **At boot** — mount it automatically when the system starts
+- **On first access** — connect when its local directory is first accessed
 
 Use **Save & Apply** after changing shares or automatic
 mounting preferences. Applying system configuration requires administrator

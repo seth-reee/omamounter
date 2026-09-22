@@ -2,6 +2,7 @@
 // boundaries replaced. This target is never installed or run as root.
 #define OMAMOUNTER_HELPER_TEST
 #include "helper.cpp"
+#include "fixtures.h"
 #include <QtTest>
 #include <QTemporaryDir>
 
@@ -19,7 +20,7 @@ private slots:
     stateDir = temp->path() + "/state";
     manifestPath = stateDir + "/managed.json";
     testMountinfo.clear(); testCommands.clear(); testFailure.clear();
-    config = importedDefaults(); config.shares.resize(1);
+    config = sampleConfig();
     config.shares[0].localPath = temp->path() + "/mount";
   }
   void applyControlRemove() {
@@ -27,7 +28,7 @@ private slots:
     QCOMPARE(loadManaged().size(), 1);
     testRequest = {{"action", "mount"}, {"share_ids", QJsonArray{config.shares[0].id}}};
     control(); QVERIFY(testCommands.contains("start " + unit()));
-    testMountinfo = ("31 24 0:30 / " + config.shares[0].localPath + " rw - nfs4 sakuya.weeb:/volume1/Usenet rw\n").toUtf8();
+    testMountinfo = ("31 24 0:30 / " + config.shares[0].localPath + " rw - nfs4 nas.example:/exports/media rw\n").toUtf8();
     testRequest["action"] = "unmount"; control();
     QVERIFY(testCommands.contains("stop " + unit()));
     testMountinfo.clear(); const auto oldUnit = unit(); config.shares.clear();

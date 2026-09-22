@@ -6,7 +6,6 @@
 #include <QJsonDocument>
 #include <QSaveFile>
 #include <QStandardPaths>
-#include <QUuid>
 #include <stdexcept>
 
 QString protocolName(Protocol value) {
@@ -83,28 +82,9 @@ AppConfig fromJson(const QJsonObject &o) {
   return c;
 }
 
-AppConfig importedDefaults() {
+AppConfig defaultConfig() {
   AppConfig c;
-  c.mountRoot = "/home/seth/Mount";
-  Server server{QUuid::createUuid().toString(QUuid::WithoutBraces),
-                "Sakuya",
-                "sakuya.weeb",
-                "192.168.100.11",
-                Protocol::Nfs,
-                "4",
-                "",
-                "",
-                "default",
-                "nfsvers=4"};
-  c.servers.append(server);
-  const QStringList names = {"Usenet",     "Anime",    "Storage",
-                             "Unfinished", "Torrents", "TV_Shows",
-                             "Music",      "Movies",   "Games"};
-  for (const auto &name : names)
-    c.shares.append({QUuid::createUuid().toString(QUuid::WithoutBraces),
-                     server.id, name, "/volume1/" + name,
-                     c.mountRoot + "/" + name, "", AutomountMode::Disabled,
-                     true});
+  c.mountRoot = QDir::homePath() + "/Mount";
   return c;
 }
 
@@ -116,7 +96,7 @@ ConfigStore::ConfigStore(QString path) : m_path(std::move(path)) {
 AppConfig ConfigStore::load() const {
   QFile file(m_path);
   if (!file.exists())
-    return importedDefaults();
+    return defaultConfig();
   if (!file.open(QIODevice::ReadOnly))
     throw std::runtime_error(file.errorString().toStdString());
   QJsonParseError error;

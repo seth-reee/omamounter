@@ -13,6 +13,7 @@ class SettingsDialog : public QDialog {
 public:
   SettingsDialog(const AppConfig &, QWidget *parent = nullptr);
   AppConfig config() const { return m_config; }
+  void beginAddServer();
 private slots:
   void loadServer(int);
   bool applyServer();
