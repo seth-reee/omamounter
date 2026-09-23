@@ -2,12 +2,15 @@
 #include "mainwindow.h"
 #include "theme.h"
 #include <QApplication>
+#include <QIcon>
 #include <QMessageBox>
 
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
   app.setApplicationName("omamounter");
   app.setApplicationVersion(OMAMOUNTER_VERSION);
+  app.setDesktopFileName("omamounter");
+  app.setWindowIcon(QIcon(":/omamounter.png"));
   ThemeManager theme(&app);
   try {
     ConfigStore store;

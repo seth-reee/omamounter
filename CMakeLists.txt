@@ -30,6 +30,10 @@ add_executable(omamounter
     cpp/mainwindow.h
     cpp/settingsdialog.cpp
     cpp/settingsdialog.h)
+qt_add_resources(omamounter "omamounter_resources"
+    PREFIX "/"
+    FILES resources/omamounter.png
+)
 target_link_libraries(omamounter PRIVATE omamounter_core Qt6::Concurrent)
 
 foreach(helper IN ITEMS omamounter-apply-helper omamounter-control-helper)
@@ -53,5 +57,6 @@ set_tests_properties(omamounter_tests PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=of
 install(TARGETS omamounter RUNTIME DESTINATION bin)
 install(TARGETS omamounter-apply-helper omamounter-control-helper RUNTIME DESTINATION lib/omamounter)
 install(FILES packaging/omamounter.desktop DESTINATION share/applications)
+install(FILES resources/omamounter.png DESTINATION share/icons/hicolor/512x512/apps)
 install(FILES packaging/org.omamounter.policy DESTINATION share/polkit-1/actions)
 install(FILES LICENSE DESTINATION share/licenses/omamounter)
