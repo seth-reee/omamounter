@@ -37,6 +37,8 @@ void ThemeManager::apply() {
   p.setColor(QPalette::WindowText, QColor(c["foreground"]));
   p.setColor(QPalette::Base, QColor(c["background"]));
   p.setColor(QPalette::Text, QColor(c["foreground"]));
+  p.setColor(QPalette::Link, QColor(c["foreground"]));
+  p.setColor(QPalette::LinkVisited, QColor(c["foreground"]));
   p.setColor(QPalette::Button, QColor(c["muted"]));
   p.setColor(QPalette::ButtonText, QColor(c["foreground"]));
   p.setColor(QPalette::Highlight, QColor(c["accent"]));

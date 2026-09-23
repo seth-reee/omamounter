@@ -55,6 +55,7 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   m_host = new QLineEdit;
   m_fallback = new QLineEdit;
   m_protocol = new QComboBox;
+  m_protocol->setObjectName("serverProtocol");
   m_protocol->addItems({"NFS", "SMB"});
   m_nfs = new QLineEdit;
   m_user = new QLineEdit;
@@ -63,6 +64,11 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   m_options = new QLineEdit;
   m_password = new QLineEdit;
   m_password->setEchoMode(QLineEdit::Password);
+  m_nfs->setObjectName("nfsVersion");
+  m_user->setObjectName("smbUsername");
+  m_domain->setObjectName("smbDomain");
+  m_smbver->setObjectName("smbVersion");
+  m_password->setObjectName("smbPassword");
   for (auto row :
        QList<QPair<QString, QWidget *>>{{"Name", m_name},
                                         {"Hostname / IP", m_host},
@@ -75,6 +81,15 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
                                         {"Mount options", m_options},
                                         {"SMB password", m_password}})
     f->addRow(row.first, row.second);
+  auto updateProtocolFields = [this, f] {
+    const bool smb = m_protocol->currentText() == "SMB";
+    f->setRowVisible(m_nfs, !smb);
+    for (auto *field : {m_user, m_domain, m_smbver, m_password})
+      f->setRowVisible(field, smb);
+  };
+  connect(m_protocol, &QComboBox::currentIndexChanged, this,
+          updateProtocolFields);
+  updateProtocolFields();
   auto *sb = new QHBoxLayout;
   for (auto pair : QList<QPair<QString, void (SettingsDialog::*)()>>{
            {"Add", &SettingsDialog::addServer},
@@ -106,9 +121,11 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   hb->addStretch();
   hl->addLayout(hb);
   tabs->addTab(hPage, "Shares");
-  auto *buttons =
-      new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel);
-  buttons->button(QDialogButtonBox::Save)->setText("Save & Apply");
+  auto *buttons = new QDialogButtonBox;
+  auto *save = buttons->addButton("Save && Apply", QDialogButtonBox::AcceptRole);
+  save->setObjectName("saveApplyButton");
+  auto *cancel = buttons->addButton("Cancel", QDialogButtonBox::RejectRole);
+  cancel->setObjectName("cancelButton");
   auto *about = buttons->addButton("About", QDialogButtonBox::HelpRole);
   about->setObjectName("aboutButton");
   connect(about, &QPushButton::clicked, this, [this] {
@@ -118,14 +135,15 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
     popup->setWindowTitle("About omamounter");
     popup->setTextFormat(Qt::RichText);
     popup->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    popup->setText(
-        "<h3>omamounter</h3>"
+    popup->setText(QString(
+        "<h3>omamounter " OMAMOUNTER_VERSION "</h3>"
         "<p>A lightweight desktop manager for NFS and SMB network shares "
         "on Omarchy Linux.</p>"
         "<p>Created by <b>Seth_Reee</b><br>"
-        "<a href=\"https://github.com/seth-reee\">GitHub: seth-reee</a><br>"
-        "<a href=\"https://github.com/seth-reee/omamounter\">Project repository</a></p>"
-        "<p>Licensed under the MIT License.</p>");
+        "<a style=\"color:%1\" href=\"https://github.com/seth-reee\">GitHub: seth-reee</a><br>"
+        "<a style=\"color:%1\" href=\"https://github.com/seth-reee/omamounter\">Project repository</a></p>"
+        "<p>Licensed under the MIT License.</p>")
+        .arg(palette().color(QPalette::WindowText).name()));
     // Use the application's icon automatically once one is supplied.
     if (!windowIcon().isNull())
       popup->setIconPixmap(windowIcon().pixmap(64, 64));

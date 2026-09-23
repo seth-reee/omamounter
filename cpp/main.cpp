@@ -7,6 +7,7 @@
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
   app.setApplicationName("omamounter");
+  app.setApplicationVersion(OMAMOUNTER_VERSION);
   ThemeManager theme(&app);
   try {
     ConfigStore store;

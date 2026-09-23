@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(omamounter VERSION 0.2.3 LANGUAGES CXX)
+project(omamounter VERSION 0.2.4 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,6 +22,7 @@ add_library(omamounter_core
     cpp/theme.h)
 target_link_libraries(omamounter_core PUBLIC Qt6::Core Qt6::Network Qt6::Widgets)
 target_include_directories(omamounter_core PUBLIC cpp)
+target_compile_definitions(omamounter_core PUBLIC OMAMOUNTER_VERSION="${PROJECT_VERSION}")
 
 add_executable(omamounter
     cpp/main.cpp

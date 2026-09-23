@@ -10,6 +10,9 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QMessageBox>
+#include <QLineEdit>
+#include <QFormLayout>
+#include <QListWidget>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QtTest>
@@ -17,6 +20,52 @@
 class Tests : public QObject {
   Q_OBJECT
 private slots:
+  void protocolFields() {
+    auto config = sampleConfig();
+    auto smb = config.servers[0];
+    smb.id = "smb-server";
+    smb.protocol = Protocol::Smb;
+    smb.smbUsername = "tester";
+    config.servers.append(smb);
+    SettingsDialog dialog(config);
+    auto *protocol = dialog.findChild<QComboBox *>("serverProtocol");
+    auto *nfs = dialog.findChild<QLineEdit *>("nfsVersion");
+    auto *user = dialog.findChild<QLineEdit *>("smbUsername");
+    auto *form = qobject_cast<QFormLayout *>(nfs->parentWidget()->layout());
+    QVERIFY(form);
+    QVERIFY(!nfs->isHidden());
+    QVERIFY(!form->labelForField(nfs)->isHidden());
+    for (auto name : {"smbUsername", "smbDomain", "smbVersion", "smbPassword"}) {
+      auto *field = dialog.findChild<QLineEdit *>(name);
+      QVERIFY(field->isHidden());
+      QVERIFY(form->labelForField(field)->isHidden());
+    }
+    protocol->setCurrentText("SMB");
+    QVERIFY(nfs->isHidden());
+    QVERIFY(form->labelForField(nfs)->isHidden());
+    QVERIFY(!user->isHidden());
+    user->setText("kept");
+    protocol->setCurrentText("NFS");
+    protocol->setCurrentText("SMB");
+    QCOMPARE(user->text(), QString("kept"));
+    dialog.findChild<QListWidget *>()->setCurrentRow(1);
+    QVERIFY(nfs->isHidden());
+    QCOMPARE(user->text(), QString("tester"));
+    dialog.findChild<QListWidget *>()->setCurrentRow(0);
+    QCOMPARE(user->text(), QString("kept"));
+  }
+  void plainSettingsButtons() {
+    SettingsDialog dialog(defaultConfig());
+    auto *save = dialog.findChild<QPushButton *>("saveApplyButton");
+    auto *cancel = dialog.findChild<QPushButton *>("cancelButton");
+    QVERIFY(save);
+    QVERIFY(cancel);
+    QCOMPARE(save->text(), QString("Save && Apply"));
+    QCOMPARE(cancel->text(), QString("Cancel"));
+    QVERIFY(save->icon().isNull());
+    QVERIFY(cancel->icon().isNull());
+    QVERIFY(save->shortcut().isEmpty());
+  }
   void removeAllShares() {
     auto config = sampleConfig();
     auto second = config.shares[0];
@@ -48,6 +97,8 @@ private slots:
     QVERIFY(popup->text().contains("Seth_Reee"));
     QVERIFY(popup->text().contains("https://github.com/seth-reee"));
     QVERIFY(popup->text().contains("NFS and SMB"));
+    QVERIFY(popup->text().contains(OMAMOUNTER_VERSION));
+    QVERIFY(popup->text().contains("color:" + dialog.palette().color(QPalette::WindowText).name()));
     popup->accept();
     QVERIFY(dialog.config().servers.isEmpty());
   }
