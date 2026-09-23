@@ -1,4 +1,4 @@
-# omamounter
+<h1><img src="resources/omamounter.png" width="56" alt="omamounter icon" align="absmiddle"> omamounter</h1>
 
 A lightweight desktop application for managing NFS and SMB/CIFS network shares
 on [Omarchy](https://omarchy.org/).
