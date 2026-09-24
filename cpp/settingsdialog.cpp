@@ -2,8 +2,10 @@
 #include "backends.h"
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFutureWatcher>
@@ -17,6 +19,7 @@
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
+#include <QTextBrowser>
 #include <QSignalBlocker>
 #include <QTabWidget>
 #include <QTableWidget>
@@ -129,25 +132,47 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   auto *about = buttons->addButton("About", QDialogButtonBox::HelpRole);
   about->setObjectName("aboutButton");
   connect(about, &QPushButton::clicked, this, [this] {
-    auto *popup = new QMessageBox(this);
+    auto *popup = new QDialog(this);
     popup->setObjectName("aboutDialog");
     popup->setAttribute(Qt::WA_DeleteOnClose);
     popup->setWindowTitle("About omamounter");
-    popup->setTextFormat(Qt::RichText);
-    popup->setTextInteractionFlags(Qt::TextBrowserInteraction);
-    popup->setText(QString(
-        "<h3>omamounter " OMAMOUNTER_VERSION "</h3>"
-        "<p>A lightweight desktop manager for NFS and SMB network shares "
-        "on Omarchy Linux.</p>"
-        "<p>Created by <b>Seth_Reee</b><br>"
-        "<a style=\"color:%1\" href=\"https://github.com/seth-reee\">GitHub: seth-reee</a><br>"
-        "<a style=\"color:%1\" href=\"https://github.com/seth-reee/omamounter\">Project repository</a></p>"
-        "<p>Licensed under the MIT License.</p>")
-        .arg(palette().color(QPalette::WindowText).name()));
-    // Use the application's icon automatically once one is supplied.
-    if (!windowIcon().isNull())
-      popup->setIconPixmap(windowIcon().pixmap(64, 64));
-    popup->setStandardButtons(QMessageBox::Ok);
+    popup->resize(580, 440);
+    auto *layout = new QVBoxLayout(popup);
+    layout->setContentsMargins(20, 20, 20, 20);
+    layout->setSpacing(10);
+
+    auto *icon = new QLabel;
+    icon->setPixmap(QPixmap(":/omamounter.png").scaled(
+        72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    layout->addWidget(icon);
+    auto *heading = new QLabel("omamounter " OMAMOUNTER_VERSION);
+    QFont font = heading->font();
+    font.setPointSize(17);
+    font.setBold(true);
+    heading->setFont(font);
+    layout->addWidget(heading);
+    layout->addWidget(new QLabel(
+        "A lightweight desktop manager for NFS and SMB network shares on Omarchy Linux."));
+
+    auto *github = new QLabel(
+        "Created by seth-reee · <a href=\"https://github.com/seth-reee\">GitHub profile</a>");
+    github->setOpenExternalLinks(true);
+    layout->addWidget(github);
+    layout->addWidget(new QLabel(
+        "MIT License · Copyright © 2026 omamounter contributors"));
+
+    QFile license(":/LICENSE");
+    auto *licenseText = new QTextBrowser;
+    if (license.open(QIODevice::ReadOnly))
+      licenseText->setPlainText(QString::fromUtf8(license.readAll()));
+    layout->addWidget(licenseText, 1);
+
+    auto *close = new QPushButton("Close");
+    auto *bottom = new QHBoxLayout;
+    bottom->addStretch();
+    bottom->addWidget(close);
+    layout->addLayout(bottom);
+    connect(close, &QPushButton::clicked, popup, &QDialog::accept);
     popup->open();
   });
   connect(buttons, &QDialogButtonBox::accepted, this,

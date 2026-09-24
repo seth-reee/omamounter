@@ -8,6 +8,8 @@
 #include "systemdclient.h"
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QLabel>
 #include <QPushButton>
 #include <QMessageBox>
 #include <QLineEdit>
@@ -15,6 +17,7 @@
 #include <QListWidget>
 #include <QTabWidget>
 #include <QTableWidget>
+#include <QTextBrowser>
 #include <QtTest>
 
 class Tests : public QObject {
@@ -92,13 +95,18 @@ private slots:
     auto *button = dialog.findChild<QPushButton *>("aboutButton");
     QVERIFY(button);
     button->click();
-    auto *popup = dialog.findChild<QMessageBox *>("aboutDialog");
+    auto *popup = dialog.findChild<QDialog *>("aboutDialog");
     QVERIFY(popup);
-    QVERIFY(popup->text().contains("Seth_Reee"));
-    QVERIFY(popup->text().contains("https://github.com/seth-reee"));
-    QVERIFY(popup->text().contains("NFS and SMB"));
-    QVERIFY(popup->text().contains(OMAMOUNTER_VERSION));
-    QVERIFY(popup->text().contains("color:" + dialog.palette().color(QPalette::WindowText).name()));
+    const auto labels = popup->findChildren<QLabel *>();
+    QString aboutText;
+    for (const auto *label : labels) aboutText += label->text();
+    QVERIFY(aboutText.contains("seth-reee"));
+    QVERIFY(aboutText.contains("https://github.com/seth-reee"));
+    QVERIFY(aboutText.contains("NFS and SMB"));
+    QVERIFY(aboutText.contains(OMAMOUNTER_VERSION));
+    auto *license = popup->findChild<QTextBrowser *>();
+    QVERIFY(license);
+    QVERIFY(license->toPlainText().contains("MIT License"));
     popup->accept();
     QVERIFY(dialog.config().servers.isEmpty());
   }
