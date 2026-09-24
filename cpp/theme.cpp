@@ -18,11 +18,15 @@ ThemeManager::ThemeManager(QApplication *app)
   apply();
 }
 void ThemeManager::apply() {
-  QMap<QString, QString> c{{"background", "#1e1e2e"},
-                           {"foreground", "#cdd6f4"},
-                           {"accent", "#89b4fa"},
-                           {"selection", "#45475a"},
-                           {"muted", "#585b70"}};
+  QMap<QString, QString> c{{"background", "#121212"},
+                           {"lighter_background", "#1e1e1e"},
+                           {"dark_background", "#121212"},
+                           {"foreground", "#bebebe"},
+                           {"light_foreground", "#8a8a8d"},
+                           {"dark_foreground", "#555555"},
+                           {"accent", "#e68e0d"},
+                           {"selection", "#333333"},
+                           {"muted", "#333333"}};
   QFile f(m_path);
   if (f.open(QIODevice::ReadOnly)) {
     QRegularExpression re("^([a-z_]+)\\s*=\\s*\"(#[0-9A-Fa-f]{6,8})\"");
@@ -33,21 +37,34 @@ void ThemeManager::apply() {
     }
   }
   QPalette p;
-  p.setColor(QPalette::Window, QColor(c["background"]));
-  p.setColor(QPalette::WindowText, QColor(c["foreground"]));
-  p.setColor(QPalette::Base, QColor(c["background"]));
+  const QColor bg(c["background"]), panel(c["lighter_background"]),
+      fg(c["foreground"]), accent(c["accent"]), selection(c["selection"]),
+      muted(c["muted"]), placeholder(c["light_foreground"]);
+  p.setColor(QPalette::Window, bg);
+  p.setColor(QPalette::WindowText, fg);
+  p.setColor(QPalette::Base, panel);
+  p.setColor(QPalette::AlternateBase, bg);
   p.setColor(QPalette::Text, QColor(c["foreground"]));
-  p.setColor(QPalette::Link, QColor(c["foreground"]));
-  p.setColor(QPalette::LinkVisited, QColor(c["foreground"]));
-  p.setColor(QPalette::Button, QColor(c["muted"]));
-  p.setColor(QPalette::ButtonText, QColor(c["foreground"]));
-  p.setColor(QPalette::Highlight, QColor(c["accent"]));
-  p.setColor(QPalette::HighlightedText, QColor(c["background"]));
+  p.setColor(QPalette::Button, panel);
+  p.setColor(QPalette::ButtonText, fg);
+  p.setColor(QPalette::Highlight, selection);
+  p.setColor(QPalette::HighlightedText, fg);
+  p.setColor(QPalette::PlaceholderText, placeholder);
+  p.setColor(QPalette::ToolTipBase, panel);
+  p.setColor(QPalette::ToolTipText, fg);
+  p.setColor(QPalette::Disabled, QPalette::WindowText, QColor(c["dark_foreground"]));
+  p.setColor(QPalette::Disabled, QPalette::Text, QColor(c["dark_foreground"]));
+  p.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(c["dark_foreground"]));
   m_app->setPalette(p);
   m_app->setStyleSheet(
-      QString("QHeaderView::section{background:%1;color:%2} "
-              "QLabel#title{color:%3;font-size:24px;font-weight:600}")
-          .arg(c["muted"], c["foreground"], c["accent"]));
+      QString("QWidget { font-size: 13px; } "
+              "QPushButton, QLineEdit, QComboBox { padding: 7px 10px; border: 1px solid %1; border-radius: 6px; } "
+              "QPushButton:hover { border-color: %2; } QPushButton:disabled { color: %3; } "
+              "QTableWidget { border: 1px solid %1; border-radius: 6px; gridline-color: %1; } "
+              "QHeaderView::section { background: %4; padding: 8px; border: none; border-bottom: 1px solid %1; } "
+              "QTableWidget::item { padding: 5px; } QTableWidget::item:selected { background: %5; }")
+          .arg(muted.name(), accent.name(), QColor(c["dark_foreground"]).name(),
+               panel.name(), selection.name()));
   if (QFile::exists(m_path) && !m_watcher.files().contains(m_path))
     m_watcher.addPath(m_path);
 }

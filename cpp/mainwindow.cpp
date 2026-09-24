@@ -4,10 +4,12 @@
 #include "settingsdialog.h"
 #include <QCheckBox>
 #include <QFile>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QMessageBox>
+#include <QPixmap>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QTimer>
@@ -19,9 +21,25 @@ MainWindow::MainWindow(AppConfig c, ConfigStore s)
   resize(1000, 540);
   auto *w = new QWidget;
   auto *l = new QVBoxLayout(w);
-  auto *t = new QLabel("Tether");
-  t->setObjectName("title");
-  l->addWidget(t);
+  l->setContentsMargins(20, 20, 20, 12);
+  l->setSpacing(12);
+  auto *titleRow = new QHBoxLayout;
+  auto *titleIcon = new QLabel;
+  titleIcon->setPixmap(QPixmap(":/tether.png").scaled(
+      42, 42, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+  auto *title = new QLabel("Tether");
+  QFont titleFont = title->font();
+  titleFont.setBold(true);
+  title->setFont(titleFont);
+  titleRow->addWidget(titleIcon);
+  titleRow->addWidget(title);
+  titleRow->addStretch();
+  auto *about = new QPushButton("About");
+  about->setObjectName("headerAboutButton");
+  titleRow->addWidget(about);
+  connect(about, &QPushButton::clicked, this,
+          [this] { showTetherAbout(this); });
+  l->addLayout(titleRow);
   l->addWidget(new QLabel("Network share manager"));
   m_welcome = new QWidget;
   m_welcome->setObjectName("welcome");

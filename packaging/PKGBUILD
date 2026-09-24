@@ -1,5 +1,5 @@
 pkgname=tether
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=1
 pkgdesc='Native Qt manager for NFS and SMB network shares'
 arch=('x86_64')

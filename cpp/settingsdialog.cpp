@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFont>
 #include <QFormLayout>
 #include <QFutureWatcher>
 #include <QHBoxLayout>
@@ -17,6 +18,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QPixmap>
 #include <QProcess>
 #include <QPushButton>
 #include <QTextBrowser>
@@ -30,6 +32,51 @@
 #include <QVBoxLayout>
 #include <QtConcurrent>
 #include <memory>
+
+void showTetherAbout(QWidget *parent) {
+  auto *popup = new QDialog(parent);
+  popup->setObjectName("aboutDialog");
+  popup->setAttribute(Qt::WA_DeleteOnClose);
+  popup->setWindowTitle("About Tether");
+  popup->resize(580, 440);
+  auto *layout = new QVBoxLayout(popup);
+  layout->setContentsMargins(20, 20, 20, 20);
+  layout->setSpacing(10);
+
+  auto *icon = new QLabel;
+  icon->setPixmap(QPixmap(":/tether.png").scaled(
+      72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+  layout->addWidget(icon);
+  auto *heading = new QLabel("Tether " TETHER_VERSION);
+  QFont font = heading->font();
+  font.setPointSize(17);
+  font.setBold(true);
+  heading->setFont(font);
+  layout->addWidget(heading);
+  layout->addWidget(new QLabel(
+      "A lightweight desktop manager for NFS and SMB network shares on Omarchy Linux."));
+
+  auto *github = new QLabel(
+      "Created by seth-reee · <a href=\"https://github.com/seth-reee\">GitHub profile</a>");
+  github->setOpenExternalLinks(true);
+  layout->addWidget(github);
+  layout->addWidget(new QLabel(
+      "MIT License · Copyright © 2026 seth-reee"));
+
+  QFile license(":/LICENSE");
+  auto *licenseText = new QTextBrowser;
+  if (license.open(QIODevice::ReadOnly))
+    licenseText->setPlainText(QString::fromUtf8(license.readAll()));
+  layout->addWidget(licenseText, 1);
+
+  auto *close = new QPushButton("Close");
+  auto *bottom = new QHBoxLayout;
+  bottom->addStretch();
+  bottom->addWidget(close);
+  layout->addLayout(bottom);
+  QObject::connect(close, &QPushButton::clicked, popup, &QDialog::accept);
+  popup->open();
+}
 
 SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
     : QDialog(p), m_config(c), m_helper(this) {
@@ -131,50 +178,7 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
   cancel->setObjectName("cancelButton");
   auto *about = buttons->addButton("About", QDialogButtonBox::HelpRole);
   about->setObjectName("aboutButton");
-  connect(about, &QPushButton::clicked, this, [this] {
-    auto *popup = new QDialog(this);
-    popup->setObjectName("aboutDialog");
-    popup->setAttribute(Qt::WA_DeleteOnClose);
-    popup->setWindowTitle("About Tether");
-    popup->resize(580, 440);
-    auto *layout = new QVBoxLayout(popup);
-    layout->setContentsMargins(20, 20, 20, 20);
-    layout->setSpacing(10);
-
-    auto *icon = new QLabel;
-    icon->setPixmap(QPixmap(":/tether.png").scaled(
-        72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    layout->addWidget(icon);
-    auto *heading = new QLabel("Tether " TETHER_VERSION);
-    QFont font = heading->font();
-    font.setPointSize(17);
-    font.setBold(true);
-    heading->setFont(font);
-    layout->addWidget(heading);
-    layout->addWidget(new QLabel(
-        "A lightweight desktop manager for NFS and SMB network shares on Omarchy Linux."));
-
-    auto *github = new QLabel(
-        "Created by seth-reee · <a href=\"https://github.com/seth-reee\">GitHub profile</a>");
-    github->setOpenExternalLinks(true);
-    layout->addWidget(github);
-    layout->addWidget(new QLabel(
-        "MIT License · Copyright © 2026 project contributors"));
-
-    QFile license(":/LICENSE");
-    auto *licenseText = new QTextBrowser;
-    if (license.open(QIODevice::ReadOnly))
-      licenseText->setPlainText(QString::fromUtf8(license.readAll()));
-    layout->addWidget(licenseText, 1);
-
-    auto *close = new QPushButton("Close");
-    auto *bottom = new QHBoxLayout;
-    bottom->addStretch();
-    bottom->addWidget(close);
-    layout->addLayout(bottom);
-    connect(close, &QPushButton::clicked, popup, &QDialog::accept);
-    popup->open();
-  });
+  connect(about, &QPushButton::clicked, this, [this] { showTetherAbout(this); });
   connect(buttons, &QDialogButtonBox::accepted, this,
           &SettingsDialog::saveAndAccept);
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);

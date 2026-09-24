@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(Tether VERSION 0.3.0 LANGUAGES CXX)
+project(Tether VERSION 0.3.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,6 +31,7 @@ add_executable(tether
     cpp/mainwindow.h
     cpp/settingsdialog.cpp
     cpp/settingsdialog.h)
+set_source_files_properties(resources/tether.png PROPERTIES QT_RESOURCE_ALIAS tether.png)
 qt_add_resources(tether "tether_resources"
     PREFIX "/"
     FILES resources/tether.png

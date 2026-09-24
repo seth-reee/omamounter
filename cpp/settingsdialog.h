@@ -8,6 +8,8 @@ class QLineEdit;
 class QListWidget;
 class QTableWidget;
 
+void showTetherAbout(QWidget *parent);
+
 class SettingsDialog : public QDialog {
   Q_OBJECT
 public:
