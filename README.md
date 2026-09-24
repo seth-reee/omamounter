@@ -1,4 +1,4 @@
-<h1><img src="resources/omamounter.png" width="56" alt="omamounter icon" align="absmiddle"> omamounter</h1>
+<h1><img src="resources/tether.png" width="56" alt="Tether icon" align="absmiddle"> Tether</h1>
 
 A lightweight desktop application for managing NFS and SMB/CIFS network shares
 on [Omarchy](https://omarchy.org/).
@@ -22,20 +22,23 @@ Install the protocol tools you plan to use:
 sudo pacman -S nfs-utils cifs-utils smbclient
 ```
 
-Download the latest Arch package from the project releases and install it with:
+Download the latest Arch package from [Releases](https://github.com/seth-reee/Tether/releases) and install it with:
 
 ```bash
-sudo pacman -U omamounter-*.pkg.tar.zst
+sudo pacman -U tether-*.pkg.tar.zst
 ```
+
+The Tether package replaces omamounter. Tether stores its configuration in a
+new location, so add your servers and shares again after upgrading.
 
 For manual installation, extract the binary tarball and follow its
 `INSTALL.txt`. It includes the application and required authorization helpers;
 Qt and protocol tools are system dependencies.
 
-After installation, launch **omamounter** from the application menu or run:
+After installation, launch **Tether** from the application menu or run:
 
 ```bash
-omamounter
+tether
 ```
 
 ## Usage
@@ -58,14 +61,14 @@ mounting preferences. Applying system configuration requires administrator
 authorization. Routine mount and unmount operations do not.
 
 Unit details are available under **Advanced: preview system configuration**.
-If installation fails, omamounter attempts to restore the previous configuration
+If installation fails, Tether attempts to restore the previous configuration
 files. Shares stopped during recovery may need mounting again. If a server is
 offline after installation, the configuration stays saved so mounting can be retried.
 
 ## Security
 
 The graphical application never runs as root. Privileged operations are
-limited to validated omamounter configuration and shares previously approved
+limited to validated Tether configuration and shares previously approved
 by the user.
 
 SMB passwords are kept out of the application configuration and command-line
@@ -80,9 +83,9 @@ as root-readable credentials.
   permits access from this machine.
 - Apply the system configuration once before using the main-window mount and
   unmount controls.
-- User configuration is stored in `~/.config/omamounter/config.json` unless
+- User configuration is stored in `~/.config/tether/config.json` unless
   `XDG_CONFIG_HOME` is set.
 
 ## License
 
-omamounter is available under the [MIT License](LICENSE).
+Tether is available under the [MIT License](LICENSE).

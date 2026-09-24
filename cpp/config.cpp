@@ -97,7 +97,7 @@ bool serverHasEnabledShares(const AppConfig &config, const QString &serverId) {
 ConfigStore::ConfigStore(QString path) : m_path(std::move(path)) {
   if (m_path.isEmpty())
     m_path = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) +
-             "/omamounter/config.json";
+             "/tether/config.json";
 }
 AppConfig ConfigStore::load() const {
   QFile file(m_path);

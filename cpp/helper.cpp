@@ -21,7 +21,7 @@
 #include <stdexcept>
 
 namespace {
-#ifdef OMAMOUNTER_HELPER_TEST
+#ifdef TETHER_HELPER_TEST
 QString systemdDir, stateDir, manifestPath;
 QJsonObject testRequest;
 QByteArray testMountinfo;
@@ -29,7 +29,7 @@ QStringList testCommands;
 QString testFailure;
 #else
 const QString systemdDir = "/etc/systemd/system";
-const QString stateDir = "/etc/omamounter";
+const QString stateDir = "/etc/tether";
 const QString manifestPath = stateDir + "/managed.json";
 #endif
 
@@ -61,7 +61,7 @@ bool validOptions(const QString &v) {
 }
 
 QString chosenAddress(const Server &server) {
-#ifdef OMAMOUNTER_HELPER_TEST
+#ifdef TETHER_HELPER_TEST
   return server.hostname;
 #else
   QByteArray hostname = server.hostname.toUtf8();
@@ -106,7 +106,7 @@ void writeFile(const QString &path, const QByteArray &data,
     fail("Could not secure " + path);
 }
 void systemctl(const QStringList &arguments, bool tolerateFailure = false) {
-#ifdef OMAMOUNTER_HELPER_TEST
+#ifdef TETHER_HELPER_TEST
   const auto command = arguments.join(' ');
   testCommands << command;
   if (command == testFailure) {
@@ -162,7 +162,7 @@ Generated generate(const Server &server, const Share &share) {
   auto escaped = escapePath(share.localPath);
   result.mountUnit = escaped + ".mount";
   result.files[result.mountUnit] =
-      QString("[Unit]\nDescription=omamounter %1 share "
+      QString("[Unit]\nDescription=Tether %1 share "
               "%2\nWants=network-online.target\nAfter=network-online."
               "target\n\n[Mount]\nWhat=%3\nWhere=%4\nType=%5\nOptions=%6\n\n["
               "Install]\nWantedBy=multi-user.target\n")
@@ -174,7 +174,7 @@ Generated generate(const Server &server, const Share &share) {
     result.enableUnit = result.automountUnit;
     result.files[result.automountUnit] =
         QString(
-            "[Unit]\nDescription=Automount omamounter share "
+            "[Unit]\nDescription=Automount Tether share "
             "%1\nWants=network-online.target\nAfter=network-online.target\n\n["
             "Automount]\nWhere=%2\n\n[Install]\nWantedBy=multi-user.target\n")
             .arg(share.name, share.localPath)
@@ -191,7 +191,7 @@ QByteArray stdinData() {
   return input.readAll();
 }
 QJsonObject parseInput() {
-#ifdef OMAMOUNTER_HELPER_TEST
+#ifdef TETHER_HELPER_TEST
   return testRequest;
 #else
   QJsonParseError error;
@@ -213,7 +213,7 @@ QJsonArray loadManaged() {
 }
 
 void verifyMount(const QJsonObject &record) {
-#ifdef OMAMOUNTER_HELPER_TEST
+#ifdef TETHER_HELPER_TEST
   if (!mountIdentityMatches(testMountinfo, record["local_path"].toString(),
                             record["source"].toString(), record["type"].toString(),
                             !record["automount_unit"].toString().isEmpty()))
@@ -438,20 +438,20 @@ void control() {
 }
 } // namespace
 
-#ifndef OMAMOUNTER_HELPER_TEST
+#ifndef TETHER_HELPER_TEST
 int main(int argc, char **argv) {
   QCoreApplication app(argc, argv);
   if (geteuid() != 0) {
-    fprintf(stderr, "omamounter helper must run as root\n");
+    fprintf(stderr, "Tether helper must run as root\n");
     return 1;
   }
-  QLockFile lock("/run/omamounter.lock");
+  QLockFile lock("/run/tether.lock");
   if (!lock.tryLock(0)) {
-    fprintf(stderr, "Another omamounter operation is running\n");
+    fprintf(stderr, "Another Tether operation is running\n");
     return 1;
   }
   try {
-#ifdef OMAMOUNTER_APPLY_HELPER
+#ifdef TETHER_APPLY_HELPER
     apply();
 #else
     control();
@@ -459,7 +459,7 @@ int main(int argc, char **argv) {
     fprintf(stdout, "{\"ok\":true}\n");
     return 0;
   } catch (const std::exception &e) {
-    fprintf(stderr, "omamounter helper: %s\n", e.what());
+    fprintf(stderr, "Tether helper: %s\n", e.what());
     return 1;
   }
 }

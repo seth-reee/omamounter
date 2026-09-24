@@ -33,7 +33,7 @@
 
 SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
     : QDialog(p), m_config(c), m_helper(this) {
-  setWindowTitle("omamounter Settings");
+  setWindowTitle("Tether Settings");
   resize(900, 600);
   auto *outer = new QVBoxLayout(this);
   auto *tabs = new QTabWidget;
@@ -135,17 +135,17 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
     auto *popup = new QDialog(this);
     popup->setObjectName("aboutDialog");
     popup->setAttribute(Qt::WA_DeleteOnClose);
-    popup->setWindowTitle("About omamounter");
+    popup->setWindowTitle("About Tether");
     popup->resize(580, 440);
     auto *layout = new QVBoxLayout(popup);
     layout->setContentsMargins(20, 20, 20, 20);
     layout->setSpacing(10);
 
     auto *icon = new QLabel;
-    icon->setPixmap(QPixmap(":/omamounter.png").scaled(
+    icon->setPixmap(QPixmap(":/tether.png").scaled(
         72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     layout->addWidget(icon);
-    auto *heading = new QLabel("omamounter " OMAMOUNTER_VERSION);
+    auto *heading = new QLabel("Tether " TETHER_VERSION);
     QFont font = heading->font();
     font.setPointSize(17);
     font.setBold(true);
@@ -159,7 +159,7 @@ SettingsDialog::SettingsDialog(const AppConfig &c, QWidget *p)
     github->setOpenExternalLinks(true);
     layout->addWidget(github);
     layout->addWidget(new QLabel(
-        "MIT License · Copyright © 2026 omamounter contributors"));
+        "MIT License · Copyright © 2026 project contributors"));
 
     QFile license(":/LICENSE");
     auto *licenseText = new QTextBrowser;
@@ -353,7 +353,7 @@ void SettingsDialog::removeShare() {
 QString SettingsDialog::lookupPassword(const QString &id) {
   QProcess p;
   p.start("/usr/bin/secret-tool",
-          {"lookup", "application", "omamounter", "server", id});
+          {"lookup", "application", "tether", "server", id});
   if (!p.waitForFinished(3000) || p.exitCode() != 0)
     return {};
   auto bytes = p.readAllStandardOutput();
@@ -363,8 +363,8 @@ QString SettingsDialog::lookupPassword(const QString &id) {
 }
 bool SettingsDialog::storePassword(const QString &id, const QString &password) {
   QProcess p;
-  p.start("/usr/bin/secret-tool", {"store", "--label=omamounter SMB password",
-                                   "application", "omamounter", "server", id});
+  p.start("/usr/bin/secret-tool", {"store", "--label=Tether SMB password",
+                                   "application", "tether", "server", id});
   if (!p.waitForStarted(2000))
     return false;
   p.write(password.toUtf8());
@@ -585,7 +585,7 @@ void SettingsDialog::runDiscovery(const Server &server,
       return;
     }
     credentials = new QTemporaryFile(
-        QDir::tempPath() + "/omamounter-XXXXXX.cred", process);
+        QDir::tempPath() + "/tether-XXXXXX.cred", process);
     credentials->setPermissions(QFileDevice::ReadOwner |
                                 QFileDevice::WriteOwner);
     if (!credentials->open()) {

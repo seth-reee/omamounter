@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=omamounter
+Name=Tether
 Comment=Manage NFS and SMB network shares
-Exec=omamounter
-Icon=omamounter
+Exec=tether
+Icon=tether
 Terminal=false
-Categories=System;Utility;Network;
+Categories=Network;
 Keywords=nfs;smb;cifs;mount;share;

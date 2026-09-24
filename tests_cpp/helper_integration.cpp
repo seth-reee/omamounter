@@ -1,6 +1,6 @@
 // Compile the actual helper implementation with process, DNS and mount-table
 // boundaries replaced. This target is never installed or run as root.
-#define OMAMOUNTER_HELPER_TEST
+#define TETHER_HELPER_TEST
 #include "helper.cpp"
 #include "fixtures.h"
 #include <QtTest>

@@ -1,4 +1,5 @@
 /build/
+/dist/
 /reference/
 /packaging/src/
 /packaging/pkg/

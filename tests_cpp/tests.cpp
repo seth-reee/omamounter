@@ -92,6 +92,7 @@ private slots:
   }
   void aboutPopup() {
     SettingsDialog dialog(defaultConfig());
+    QCOMPARE(dialog.windowTitle(), QString("Tether Settings"));
     auto *button = dialog.findChild<QPushButton *>("aboutButton");
     QVERIFY(button);
     button->click();
@@ -103,7 +104,8 @@ private slots:
     QVERIFY(aboutText.contains("seth-reee"));
     QVERIFY(aboutText.contains("https://github.com/seth-reee"));
     QVERIFY(aboutText.contains("NFS and SMB"));
-    QVERIFY(aboutText.contains(OMAMOUNTER_VERSION));
+    QVERIFY(aboutText.contains("Tether"));
+    QVERIFY(aboutText.contains(TETHER_VERSION));
     auto *license = popup->findChild<QTextBrowser *>();
     QVERIFY(license);
     QVERIFY(license->toPlainText().contains("MIT License"));

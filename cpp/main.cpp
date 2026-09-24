@@ -7,10 +7,10 @@
 
 int main(int argc, char **argv) {
   QApplication app(argc, argv);
-  app.setApplicationName("omamounter");
-  app.setApplicationVersion(OMAMOUNTER_VERSION);
-  app.setDesktopFileName("omamounter");
-  app.setWindowIcon(QIcon(":/omamounter.png"));
+  app.setApplicationName("Tether");
+  app.setApplicationVersion(TETHER_VERSION);
+  app.setDesktopFileName("tether");
+  app.setWindowIcon(QIcon(":/tether.png"));
   ThemeManager theme(&app);
   try {
     ConfigStore store;
@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     window.show();
     return app.exec();
   } catch (const std::exception &e) {
-    QMessageBox::critical(nullptr, "omamounter", e.what());
+    QMessageBox::critical(nullptr, "Tether", e.what());
     return 1;
   }
 }

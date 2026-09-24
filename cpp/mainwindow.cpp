@@ -15,11 +15,11 @@
 
 MainWindow::MainWindow(AppConfig c, ConfigStore s)
     : m_config(std::move(c)), m_store(std::move(s)), m_helper(this) {
-  setWindowTitle("omamounter");
+  setWindowTitle("Tether");
   resize(1000, 540);
   auto *w = new QWidget;
   auto *l = new QVBoxLayout(w);
-  auto *t = new QLabel("omamounter");
+  auto *t = new QLabel("Tether");
   t->setObjectName("title");
   l->addWidget(t);
   l->addWidget(new QLabel("Network share manager"));

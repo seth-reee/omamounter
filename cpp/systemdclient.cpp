@@ -38,7 +38,7 @@ QString previewUnits(const AppConfig &c) {
     if (it->protocol == Protocol::Nfs && options.isEmpty())
       options = "nfsvers=" + it->nfsVersion;
     if (it->protocol == Protocol::Smb) {
-      QStringList o{"credentials=/etc/omamounter/credentials/" + it->id +
+      QStringList o{"credentials=/etc/tether/credentials/" + it->id +
                     ".cred"};
       if (it->smbVersion != "default")
         o << "vers=" + QString(it->smbVersion).remove("SMB");
@@ -97,13 +97,13 @@ void HelperClient::apply(const AppConfig &c,
       credentials[s.id] = QJsonObject{{"username", s.smbUsername},
                                       {"password", passwords.value(s.id)},
                                       {"domain", s.smbDomain}};
-  start("/usr/lib/omamounter/omamounter-apply-helper",
+  start("/usr/lib/tether/tether-apply-helper",
         {{"config", toJson(c)}, {"credentials", credentials}});
 }
 void HelperClient::control(const QString &a, const QStringList &ids) {
   QJsonArray array;
   for (const auto &id : ids)
     array.append(id);
-  start("/usr/lib/omamounter/omamounter-control-helper",
+  start("/usr/lib/tether/tether-control-helper",
         {{"action", a}, {"share_ids", array}});
 }
