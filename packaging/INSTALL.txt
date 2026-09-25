@@ -1,4 +1,4 @@
-Tether manual binary installation (Arch Linux x86_64)
+Tether manual binary installation (Omarchy x86_64 or ARM64; Arch Linux or Arch Linux ARM)
 
 Prefer the .pkg.tar.zst package: sudo pacman -U tether-*.pkg.tar.zst
 

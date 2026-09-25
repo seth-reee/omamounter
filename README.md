@@ -22,11 +22,15 @@ Install the protocol tools you plan to use:
 sudo pacman -S nfs-utils cifs-utils smbclient
 ```
 
-Download the latest Arch package from [Releases](https://github.com/seth-reee/Tether/releases) and install it with:
+Download the latest Omarchy package from [Releases](https://github.com/seth-reee/Tether/releases) and install it with:
 
 ```bash
 sudo pacman -U tether-*.pkg.tar.zst
 ```
+
+The package recipe supports Omarchy on x86_64 and ARM64, using Arch Linux and Arch Linux ARM respectively. Use a package whose filename matches your machine's architecture. To build from a tagged release on either architecture, install `base-devel`, `cmake`, `ninja`, and `qt6-base`, then run `makepkg -s` in `packaging/`.
+
+**ARM64 status:** The ARM64 package built and passed automated tests under QEMU, but remains untested on a real ARM64 Omarchy desktop. Network mounting and authorization need a real-system check.
 
 The Tether package replaces omamounter. Tether stores its configuration in a
 new location, so add your servers and shares again after upgrading.
